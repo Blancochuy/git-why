@@ -6,8 +6,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chuy/git-why/internal/git"
-	"github.com/chuy/git-why/internal/render"
+	"github.com/blancochuy/git-why/internal/git"
+	"github.com/blancochuy/git-why/internal/render"
 )
 
 type OutputJSON struct {

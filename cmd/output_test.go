@@ -6,7 +6,7 @@ import (
 	"os"
 	"testing"
 
-	"github.com/chuy/git-why/internal/git"
+	"github.com/blancochuy/git-why/internal/git"
 	"github.com/stretchr/testify/assert"
 )
 

@@ -5,7 +5,7 @@ import (
 	"regexp"
 	"strings"
 
-	"github.com/chuy/git-why/internal/git"
+	"github.com/blancochuy/git-why/internal/git"
 	"github.com/spf13/cobra"
 )
 
@@ -56,7 +56,7 @@ func runSearch(cmd *cobra.Command, args []string) error {
 	for _, c := range commits {
 		msg := strings.Split(c.Message, "\n")[0]
 		if shortOutput {
-			fmt.Printf("%s · %s · @%s · %s\n",
+			fmt.Printf("%s - %s - @%s - %s\n",
 				c.Hash[:7],
 				c.Date.Format("2006-01-02"),
 				c.Author,
@@ -98,3 +98,4 @@ func highlightTerm(text, term string) string {
 		return highlight + match + reset
 	})
 }
+

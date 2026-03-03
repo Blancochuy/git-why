@@ -1,6 +1,6 @@
-module github.com/chuy/git-why
+module github.com/blancochuy/git-why
 
-go 1.25.0
+go 1.23
 
 require (
 	github.com/spf13/cobra v1.10.2

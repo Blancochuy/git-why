@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chuy/git-why/internal/git"
+	"github.com/blancochuy/git-why/internal/git"
 )
 
 func TestAIRenderer_RenderContext(t *testing.T) {

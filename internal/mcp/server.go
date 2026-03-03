@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 
-	"github.com/chuy/git-why/internal/git"
-	"github.com/chuy/git-why/internal/render"
+	"github.com/blancochuy/git-why/internal/git"
+	"github.com/blancochuy/git-why/internal/render"
 )
 
 type Server struct {
@@ -76,21 +76,21 @@ func (s *Server) handleListTools(req *Request) {
 	tools := []Tool{
 		{
 			Name:        "git-why-context",
-			Description: "Explica la intención histórica de una línea o rango de líneas de código usando Git. Útil para entender por qué existe un bloque de código confuso.",
+			Description: "Explain the historical intent of a line or range of lines using Git context.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{
 					"file": {
 						Type:        "string",
-						Description: "Ruta al archivo (relativa a la raíz del repo)",
+						Description: "Path to the file (relative to the repository root)",
 					},
 					"line": {
 						Type:        "integer",
-						Description: "Número de línea específico (1-indexed)",
+						Description: "Specific line number (1-indexed)",
 					},
 					"range": {
 						Type:        "string",
-						Description: "Rango de líneas opcional (ej: '10-20')",
+						Description: "Optional line range (for example: '10-20')",
 					},
 				},
 				Required: []string{"file"},
@@ -98,13 +98,13 @@ func (s *Server) handleListTools(req *Request) {
 		},
 		{
 			Name:        "git-why-stats",
-			Description: "Muestra estadísticas de autoría y cambios históricos para un archivo específico. Ayuda a identificar quién es el experto en un módulo.",
+			Description: "Show authorship and historical change statistics for a specific file.",
 			InputSchema: InputSchema{
 				Type: "object",
 				Properties: map[string]Property{
 					"file": {
 						Type:        "string",
-						Description: "Ruta al archivo",
+						Description: "Path to the file",
 					},
 				},
 				Required: []string{"file"},
@@ -150,25 +150,16 @@ func (s *Server) callGitWhyContext(id interface{}, args json.RawMessage) {
 	if !s.repo.IsGitRepo() {
 		s.sendResponse(id, CallToolResult{
 			IsError: true,
-			Content: []Content{{Type: "text", Text: "Error: No es un repositorio de Git en " + arguments.File}},
+			Content: []Content{{Type: "text", Text: "Error: not a Git repository for " + arguments.File}},
 		})
 		return
 	}
-
-	// Capture AI-optimized output
-	// For simplicity in this first version, we'll refactor how output is generated
-	// to return a string instead of printing directly.
-
-	// Implementation note: In a real scenario, we'd refactor AIRenderer.
-	// For now, I'll implement a helper that returns the data.
-
-	var textOutput string
 
 	blame, err := s.repo.Blame(arguments.File, arguments.Line)
 	if err != nil {
 		s.sendResponse(id, CallToolResult{
 			IsError: true,
-			Content: []Content{{Type: "text", Text: fmt.Sprintf("Error al hacer blame: %v", err)}},
+			Content: []Content{{Type: "text", Text: fmt.Sprintf("Error running git blame: %v", err)}},
 		})
 		return
 	}
@@ -177,7 +168,7 @@ func (s *Server) callGitWhyContext(id interface{}, args json.RawMessage) {
 	if err != nil {
 		s.sendResponse(id, CallToolResult{
 			IsError: true,
-			Content: []Content{{Type: "text", Text: fmt.Sprintf("Error al mostrar commit: %v", err)}},
+			Content: []Content{{Type: "text", Text: fmt.Sprintf("Error retrieving commit details: %v", err)}},
 		})
 		return
 	}
@@ -186,7 +177,7 @@ func (s *Server) callGitWhyContext(id interface{}, args json.RawMessage) {
 	commit.Diff = diff
 
 	renderer := render.NewAIRenderer()
-	textOutput = renderer.GetContext(arguments.File, arguments.Line, blame, commit)
+	textOutput := renderer.GetContext(arguments.File, arguments.Line, blame, commit)
 
 	s.sendResponse(id, CallToolResult{
 		Content: []Content{{Type: "text", Text: textOutput}},
@@ -210,7 +201,7 @@ func (s *Server) callGitWhyStats(id interface{}, args json.RawMessage) {
 	if err != nil {
 		s.sendResponse(id, CallToolResult{
 			IsError: true,
-			Content: []Content{{Type: "text", Text: fmt.Sprintf("Error al obtener stats: %v", err)}},
+			Content: []Content{{Type: "text", Text: fmt.Sprintf("Error retrieving stats: %v", err)}},
 		})
 		return
 	}

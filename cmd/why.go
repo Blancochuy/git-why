@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/chuy/git-why/internal/git"
+	"github.com/blancochuy/git-why/internal/git"
 	"github.com/spf13/cobra"
 )
 
@@ -100,7 +100,7 @@ func showLine(repo *git.Repo, file string, line int) error {
 	}
 
 	if shortOutput {
-		fmt.Printf("%s · %s · @%s · %s\n",
+		fmt.Printf("%s - %s - @%s - %s\n",
 			blame.Hash[:7],
 			commit.Date.Format("2006-01-02"),
 			blame.Author,
@@ -141,7 +141,7 @@ func showRange(repo *git.Repo, file string, start, end int) error {
 	fmt.Printf("Commits that modified %s:%d-%d:\n\n", file, start, end)
 	for _, c := range commits {
 		if shortOutput {
-			fmt.Printf("%s · %s · @%s · %s\n",
+			fmt.Printf("%s - %s - @%s - %s\n",
 				c.Hash[:7],
 				c.Date.Format("2006-01-02"),
 				c.Author,
@@ -158,3 +158,4 @@ func showRange(repo *git.Repo, file string, start, end int) error {
 	}
 	return nil
 }
+

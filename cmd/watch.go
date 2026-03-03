@@ -8,8 +8,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chuy/git-why/internal/git"
-	"github.com/chuy/git-why/internal/render"
+	"github.com/blancochuy/git-why/internal/git"
+	"github.com/blancochuy/git-why/internal/render"
 	"github.com/spf13/cobra"
 )
 
@@ -125,7 +125,7 @@ func showLineWatch(repo *git.Repo, file string, lineNum int) error {
 	}
 
 	if plainOutput {
-		fmt.Printf("Line %d: %s · %s · @%s · %s\n",
+		fmt.Printf("Line %d: %s - %s - @%s - %s\n",
 			lineNum,
 			blame.Hash[:7],
 			commit.Date.Format("2006-01-02"),
@@ -150,7 +150,7 @@ type WatchOutput struct {
 }
 
 func formatWatchOutput(file string, lineNum int, blame *git.BlameResult, commit *git.CommitInfo) string {
-	return fmt.Sprintf("Line %d: %s · %s · @%s · %s",
+	return fmt.Sprintf("Line %d: %s - %s - @%s - %s",
 		lineNum,
 		blame.Hash[:7],
 		commit.Date.Format("2006-01-02"),
@@ -161,3 +161,4 @@ func formatWatchOutput(file string, lineNum int, blame *git.BlameResult, commit 
 
 type gitBlameResult = git.BlameResult
 type gitCommitInfo = git.CommitInfo
+

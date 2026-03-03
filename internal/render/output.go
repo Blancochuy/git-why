@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chuy/git-why/internal/git"
+	"github.com/blancochuy/git-why/internal/git"
 )
 
 type Colors struct {
@@ -53,7 +53,7 @@ func NewRenderer(plain bool) *Renderer {
 func (r *Renderer) RenderLine(file string, lineNum int, blame *git.BlameResult, commit *git.CommitInfo) {
 	c := r.colors
 
-	fmt.Printf("\n%s%sLine %d%s — %s%s%s — Added: %s%s by %s@%s%s\n",
+	fmt.Printf("\n%s%sLine %d%s - %s%s%s - Added: %s%s by %s@%s%s\n",
 		c.Header, c.File, lineNum, c.Reset,
 		c.Hash, blame.Hash[:12], c.Reset,
 		c.Date, commit.Date.Format("2006-01-02"),
@@ -93,7 +93,7 @@ func (r *Renderer) RenderRange(file string, start, end int, commits []git.Commit
 }
 
 func FormatShort(blame *git.BlameResult, commit *git.CommitInfo) string {
-	return fmt.Sprintf("%s · %s · @%s · %s",
+	return fmt.Sprintf("%s - %s - @%s - %s",
 		blame.Hash[:7],
 		commit.Date.Format("2006-01-02"),
 		blame.Author,

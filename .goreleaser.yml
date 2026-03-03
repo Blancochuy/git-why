@@ -42,7 +42,7 @@ brews:
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     commit_author:
       name: blancochuy
-      email: [EMAIL_ADDRESS]
+      email: chuy@blancochuy.dev
     directory: Formula
     test: |
       system "#{bin}/git-why --version"
@@ -86,4 +86,4 @@ release:
     
     See [CHANGELOG.md](CHANGELOG.md) for details.
   footer: |
-    **Full Changelog**: https://github.com/chuy/git-why/compare/{{ .PreviousTag }}...{{ .Tag }}
+    **Full Changelog**: https://github.com/blancochuy/git-why/compare/{{ .PreviousTag }}...{{ .Tag }}

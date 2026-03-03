@@ -4,7 +4,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chuy/git-why/internal/git"
+	"github.com/blancochuy/git-why/internal/git"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -23,18 +23,18 @@ func TestNewRenderer(t *testing.T) {
 func TestFormatShort(t *testing.T) {
 	blame := &git.BlameResult{
 		Hash:   "a3f92c1a2b4c3d4e5f6a7b8c9d0e1f2a3b4c5d6e",
-		Author: "Carlos García",
+		Author: "Carlos Garcia",
 	}
 
 	commit := &git.CommitInfo{
 		Hash:    "a3f92c1a2b4c3d4e5f6a7b8c9d0e1f2a3b4c5d6e",
-		Author:  "Carlos García",
+		Author:  "Carlos Garcia",
 		Message: "feat: add JWT refresh token rotation\n\nDetailed body here",
 		Date:    time.Date(2024, 8, 14, 12, 0, 0, 0, time.UTC),
 	}
 
 	result := FormatShort(blame, commit)
-	expected := "a3f92c1 · 2024-08-14 · @Carlos García · feat: add JWT refresh token rotation"
+	expected := "a3f92c1 - 2024-08-14 - @Carlos Garcia - feat: add JWT refresh token rotation"
 	assert.Equal(t, expected, result)
 }
 

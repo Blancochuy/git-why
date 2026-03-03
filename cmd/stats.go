@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/chuy/git-why/internal/git"
+	"github.com/blancochuy/git-why/internal/git"
 	"github.com/spf13/cobra"
 )
 
@@ -171,15 +171,13 @@ func printMonthlyActivity(stats *git.FileStats) {
 	fmt.Println()
 }
 
-// render hotLines removed
-
 func statsProgressBar(percentage float64, width int) string {
 	filled := int(percentage * float64(width) / 100)
 	if filled > width {
 		filled = width
 	}
 
-	bar := strings.Repeat("█", filled) + strings.Repeat("░", width-filled)
+	bar := strings.Repeat("#", filled) + strings.Repeat(".", width-filled)
 	return bar
 }
 

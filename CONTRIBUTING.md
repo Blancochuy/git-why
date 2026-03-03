@@ -1,144 +1,79 @@
 # Contributing to git-why
 
-Thank you for your interest in contributing to git-why!
+Thanks for contributing.
 
-## Development Setup
+## Prerequisites
 
-### Prerequisites
+- Go 1.23 or newer
+- Git 2.20 or newer
 
-- Go 1.22 or later
-- Git 2.20 or later
-- Make (optional, for build tasks)
+## Local Setup
 
-### Getting Started
-
-1. Fork the repository
-2. Clone your fork:
-   ```bash
-   git clone https://github.com/YOUR_USERNAME/git-why.git
-   cd git-why
-   ```
-
-3. Install dependencies:
-   ```bash
-   go mod download
-   ```
-
-4. Build the project:
-   ```bash
-   go build -o git-why .
-   ```
-
-5. Run tests:
-   ```bash
-   go test ./... -v
-   ```
+```bash
+git clone https://github.com/blancochuy/git-why.git
+cd git-why
+go mod download
+go test ./...
+go build -o git-why .
+```
 
 ## Development Workflow
 
-### Running Tests
+1. Create a branch from `main`.
+2. Add or update tests for your change.
+3. Run local checks.
+4. Open a pull request.
+
+## Quality Checks
 
 ```bash
-# Run all tests
+# tests
 go test ./...
 
-# Run tests with coverage
+# coverage
 go test ./... -cover
 
-# Run specific package tests
-go test ./internal/git -v
-```
-
-### Linting
-
-We use golangci-lint for code quality:
-
-```bash
-# Install golangci-lint
-go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest
-
-# Run linter
+# lint (if installed)
 golangci-lint run
 ```
 
-### Building
+## Commit Convention
 
-```bash
-# Development build
-go build -o git-why .
+This project uses Conventional Commits:
 
-# Production build (optimized)
-go build -ldflags="-s -w" -o git-why .
+- `feat:` new feature
+- `fix:` bug fix
+- `docs:` documentation change
+- `test:` tests only
+- `refactor:` internal code change without behavior change
+- `chore:` tooling/maintenance
+
+Example:
+
+```text
+feat(search): add regex flag for history term matching
 ```
+
+## Pull Request Guidelines
+
+- Keep PR scope focused.
+- Update docs if behavior changes.
+- Add tests for new behavior.
+- Ensure CI is green.
 
 ## Project Structure
 
-```
+```text
 git-why/
-├── cmd/                    # CLI commands
-│   ├── root.go            # Root command and global flags
-│   ├── why.go             # Main why command
-│   ├── stats.go           # Statistics command
-│   ├── search.go          # Search command
-│   └── watch.go           # Watch mode command
-├── internal/
-│   ├── git/               # Git operations wrapper
-│   ├── enricher/          # GitHub/GitLab API clients
-│   ├── cache/             # Local caching
-│   └── render/            # Terminal output formatting
-├── .github/
-│   └── workflows/         # GitHub Actions CI/CD
-└── test/
-    └── fixtures/          # Test repositories
+  cmd/         # Cobra commands
+  internal/    # Internal packages (git, render, mcp, cache, enricher)
+  .github/     # CI workflows and templates
 ```
 
-## Adding a New Feature
+## Code of Conduct
 
-1. Create a new branch:
-   ```bash
-   git checkout -b feature/my-new-feature
-   ```
-
-2. Write tests first (TDD approach)
-
-3. Implement the feature
-
-4. Ensure all tests pass:
-   ```bash
-   go test ./...
-   ```
-
-5. Update documentation if needed
-
-6. Submit a pull request
-
-## Code Style
-
-- Follow standard Go conventions
-- Run `go fmt` before committing
-- Add comments for exported functions
-- Write meaningful commit messages (Conventional Commits)
-
-## Commit Message Format
-
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
-
-```
-<type>(<scope>): <description>
-
-[optional body]
-
-[optional footer]
-```
-
-Types:
-- `feat`: New feature
-- `fix`: Bug fix
-- `docs`: Documentation changes
-- `test`: Adding or updating tests
-- `refactor`: Code refactoring
-- `chore`: Maintenance tasks
+By participating, you agree to follow the [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the MIT License.
+By contributing, you agree that your contributions are licensed under MIT.

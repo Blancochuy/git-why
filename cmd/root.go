@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 
 	"github.com/spf13/cobra"
@@ -14,6 +15,9 @@ var (
 	mdOutput     bool
 	llmOutput    bool
 	includeDiff  bool
+	version      = "dev"
+	commit       = "none"
+	buildDate    = "unknown"
 )
 
 var rootCmd = &cobra.Command{
@@ -24,7 +28,21 @@ var rootCmd = &cobra.Command{
 
 It combines git log, git blame, and semantic search to present historical
 context for any line of code in a readable and actionable format.`,
-	Version: "0.1.0",
+	Version: version,
+	Args:    cobra.MaximumNArgs(1),
+	RunE: func(cmd *cobra.Command, args []string) error {
+		if len(args) == 0 {
+			return cmd.Help()
+		}
+		return runWhy(cmd, args)
+	},
+}
+
+func SetVersionInfo(v, c, d string) {
+	version = v
+	commit = c
+	buildDate = d
+	rootCmd.Version = fmt.Sprintf("%s (commit %s, built %s)", version, commit, buildDate)
 }
 
 func Execute() {

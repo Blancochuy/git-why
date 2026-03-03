@@ -10,7 +10,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/chuy/git-why/internal/cache"
+	"github.com/blancochuy/git-why/internal/cache"
 )
 
 type GitLabClient struct {

@@ -3,7 +3,7 @@ package cmd
 import (
 	"os"
 
-	"github.com/chuy/git-why/internal/mcp"
+	"github.com/blancochuy/git-why/internal/mcp"
 	"github.com/spf13/cobra"
 )
 
