@@ -12,6 +12,8 @@ var (
 	plainOutput  bool
 	jsonOutput   bool
 	mdOutput     bool
+	llmOutput    bool
+	includeDiff  bool
 )
 
 var rootCmd = &cobra.Command{
@@ -37,4 +39,6 @@ func init() {
 	rootCmd.PersistentFlags().BoolVarP(&plainOutput, "plain", "p", false, "output without colors")
 	rootCmd.PersistentFlags().BoolVar(&jsonOutput, "json", false, "output in JSON format")
 	rootCmd.PersistentFlags().BoolVar(&mdOutput, "md", false, "output in Markdown format")
+	rootCmd.PersistentFlags().BoolVar(&llmOutput, "llm", false, "output optimized for LLM agents")
+	rootCmd.PersistentFlags().BoolVar(&includeDiff, "include-diff", false, "include commit diff in output")
 }

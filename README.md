@@ -69,6 +69,8 @@ git-why src/auth.ts:142 --context 5
 git-why src/auth.ts:142 --json    # JSON output
 git-why src/auth.ts:142 --md      # Markdown output
 git-why src/auth.ts:142 --plain   # No colors (for pipes)
+git-why src/auth.ts:142 --llm     # LLM-optimized "Context Pack"
+git-why src/auth.ts:142 --include-diff # Include commit patch
 ```
 
 ### Statistics
@@ -88,10 +90,11 @@ git-why stats src/auth.ts
 ### Advanced Features
 - [x] Function/block detection (`--fn`) — Go, TS/JS, Python, Java, Rust
 - [x] Search in commit history (`--search`) — Text + regex support
+- [x] AI context optimization (`--llm`) — Optimized for Agents/LLMs
 - [ ] Watch mode for editor integration (`watch`)
 - [ ] AI-powered summaries (local via Ollama) — `--ai`
+- [x] Git diff extraction (`--include-diff`)
 - [ ] GitHub/GitLab PR & Issue integration — Auto-link commits to PRs
-- [ ] Semantic Tracing: `-C` (copy) and `-M` (move) detection
 - [ ] Shell completions (Bash, Zsh, Fish)
 - [ ] Author statistics and heatmap (`stats`)
 
@@ -116,9 +119,30 @@ go build -o git-why .
 go install .
 ```
 
-## License
+## AI Agent Integration (MCP)
 
-MIT License - see [LICENSE](LICENSE) for details.
+`git-why` can be used as a native tool by AI agents (Claude Desktop, Cursor, etc.) via the Model Context Protocol.
+
+### Configuration
+
+Add this to your MCP settings (e.g., `claude_desktop_config.json`):
+
+```json
+{
+  "mcpServers": {
+    "git-why": {
+      "command": "git-why",
+      "args": ["mcp"]
+    }
+  }
+}
+```
+
+### Tools exposed:
+- `git-why-context`: Explains the context of a line or range.
+- `git-why-stats`: Shows author and history statistics for a file.
+
+## License
 
 ## Contributing
 

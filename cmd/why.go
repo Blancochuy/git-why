@@ -109,6 +109,17 @@ func showLine(repo *git.Repo, file string, line int) error {
 		return nil
 	}
 
+	if includeDiff || llmOutput {
+		diff, err := repo.GetCommitDiff(blame.Hash)
+		if err == nil {
+			commit.Diff = diff
+		}
+	}
+
+	if llmOutput {
+		return outputLLM(file, line, blame, commit)
+	}
+
 	if jsonOutput {
 		return outputJSON(file, line, blame, commit)
 	}

@@ -124,3 +124,9 @@ func renderResult(file string, line int, blame *git.BlameResult, commit *git.Com
 	renderer := render.NewRenderer(plainOutput)
 	renderer.RenderLine(file, line, blame, commit)
 }
+
+func outputLLM(file string, line int, blame *git.BlameResult, commit *git.CommitInfo) error {
+	renderer := render.NewAIRenderer()
+	renderer.RenderContext(file, line, blame, commit)
+	return nil
+}

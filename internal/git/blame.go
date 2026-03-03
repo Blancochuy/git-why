@@ -27,6 +27,7 @@ type CommitInfo struct {
 	Date        time.Time
 	Message     string
 	Body        string
+	Diff        string
 }
 
 type Repo struct {
