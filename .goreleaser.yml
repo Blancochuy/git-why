@@ -1,0 +1,89 @@
+project_name: git-why
+
+before:
+  hooks:
+    - go mod tidy
+    - go generate ./...
+
+builds:
+  - env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+      - darwin
+      - windows
+    goarch:
+      - amd64
+      - arm64
+    ldflags:
+      - -s -w -X main.version={{.Version}} -X main.commit={{.Commit}} -X main.date={{.Date}}
+    binary: git-why
+
+archives:
+  - format: tar.gz
+    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    format_overrides:
+      - goos: windows
+        format: zip
+    files:
+      - README.md
+      - LICENSE
+      - CHANGELOG.md
+
+brews:
+  - name: git-why
+    homepage: "https://github.com/chuy/git-why"
+    description: "Understand why code exists, not just who wrote it"
+    license: MIT
+    repository:
+      owner: chuy
+      name: homebrew-tap
+      branch: main
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+    commit_author:
+      name: chuy
+      email: chuy@example.com
+    directory: Formula
+    test: |
+      system "#{bin}/git-why --version"
+    install: |
+      bin.install "git-why"
+
+nfpms:
+  - package_name: git-why
+    vendor: chuy
+    homepage: https://github.com/chuy/git-why
+    maintainer: chuy <chuy@example.com>
+    description: Understand why code exists, not just who wrote it
+    license: MIT
+    formats:
+      - deb
+      - rpm
+      - archlinux
+
+checksum:
+  name_template: 'checksums.txt'
+
+changelog:
+  sort: asc
+  filters:
+    exclude:
+      - '^docs:'
+      - '^test:'
+      - '^ci:'
+      - Merge pull request
+      - Merge branch
+
+release:
+  github:
+    owner: chuy
+    name: git-why
+  draft: false
+  prerelease: auto
+  name_template: "{{.ProjectName}} v{{.Version}}"
+  header: |
+    ## git-why {{.Version}}
+    
+    See [CHANGELOG.md](CHANGELOG.md) for details.
+  footer: |
+    **Full Changelog**: https://github.com/chuy/git-why/compare/{{ .PreviousTag }}...{{ .Tag }}
