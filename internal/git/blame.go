@@ -11,11 +11,11 @@ import (
 )
 
 type BlameResult struct {
-	Hash     string
-	Author   string
-	AuthorMail string
-	Date     time.Time
-	Line     string
+	Hash            string
+	Author          string
+	AuthorMail      string
+	Date            time.Time
+	Line            string
 	OriginalLineNum int
 	FinalLineNum    int
 }
@@ -162,8 +162,8 @@ func parseLogOutput(output string) ([]CommitInfo, error) {
 		}
 
 		commit := CommitInfo{
-			Hash:   parts[0],
-			Author: parts[1],
+			Hash:    parts[0],
+			Author:  parts[1],
 			Message: parts[3],
 		}
 
@@ -183,4 +183,65 @@ func parseTimestamp(s string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return time.Unix(ts, 0), nil
+}
+
+func (r *Repo) SearchHistory(file, term string, isRegex bool) ([]CommitInfo, error) {
+	output, err := r.runGit("log", "--no-patch", "--format=%H|%an|%at|%s%n%b", "--", file)
+	if err != nil {
+		return nil, err
+	}
+
+	return filterCommitsByTerm(output, term, isRegex)
+}
+
+func filterCommitsByTerm(output, term string, isRegex bool) ([]CommitInfo, error) {
+	var commits []CommitInfo
+	blocks := strings.Split(output, "\n\n")
+
+	for _, block := range blocks {
+		if strings.TrimSpace(block) == "" {
+			continue
+		}
+
+		lines := strings.Split(block, "\n")
+		if len(lines) < 1 {
+			continue
+		}
+
+		parts := strings.SplitN(lines[0], "|", 4)
+		if len(parts) < 4 {
+			continue
+		}
+
+		commit := CommitInfo{
+			Hash:    parts[0],
+			Author:  parts[1],
+			Message: parts[3],
+		}
+
+		if t, err := parseTimestamp(parts[2]); err == nil {
+			commit.Date = t
+		}
+
+		if len(lines) > 1 {
+			commit.Body = strings.Join(lines[1:], "\n")
+		}
+
+		if matchesTerm(commit, term, isRegex) {
+			commits = append(commits, commit)
+		}
+	}
+
+	return commits, nil
+}
+
+func matchesTerm(commit CommitInfo, term string, isRegex bool) bool {
+	text := commit.Message + " " + commit.Body
+
+	if isRegex {
+		matched, _ := regexp.MatchString(term, text)
+		return matched
+	}
+
+	return strings.Contains(strings.ToLower(text), strings.ToLower(term))
 }

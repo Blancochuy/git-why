@@ -10,14 +10,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var (
+	funcName string
+)
+
 var whyCmd = &cobra.Command{
-	Use:   "why <file>:<line> or <file>:<start>-<end>",
+	Use:   "why <file>:<line> or <file>:<start>-<end> or <file> --fn <function>",
 	Short: "Show historical context for a line or range of lines",
 	Long: `Show who wrote a line, when, and most importantly - why.
 
 Examples:
   git-why src/auth.ts:142              # Single line
   git-why src/auth.ts:140-155          # Range of lines
+  git-why src/auth.ts --fn authenticateUser  # Function history
   git-why src/auth.ts:142 --short      # Compact output
   git-why src/auth.ts:142 --context 5  # More context`,
 	Args: cobra.ExactArgs(1),
@@ -25,26 +30,41 @@ Examples:
 }
 
 func init() {
+	whyCmd.Flags().StringVarP(&funcName, "fn", "f", "", "function name to analyze")
 	rootCmd.AddCommand(whyCmd)
 }
 
 func runWhy(cmd *cobra.Command, args []string) error {
 	target := args[0]
 
-	file, line, endLine, err := parseTarget(target)
-	if err != nil {
-		return err
-	}
-
 	repo := git.NewRepo()
 	if !repo.IsGitRepo() {
 		return fmt.Errorf("not a git repository (or any parent up to mount point)")
+	}
+
+	if funcName != "" {
+		return showFunction(repo, target, funcName)
+	}
+
+	file, line, endLine, err := parseTarget(target)
+	if err != nil {
+		return err
 	}
 
 	if endLine > 0 {
 		return showRange(repo, file, line, endLine)
 	}
 	return showLine(repo, file, line)
+}
+
+func showFunction(repo *git.Repo, file, funcName string) error {
+	bounds, err := repo.FindFunction(file, funcName)
+	if err != nil {
+		return err
+	}
+
+	fmt.Printf("Function %s() in %s (lines %d-%d):\n\n", funcName, file, bounds.StartLine, bounds.EndLine)
+	return showRange(repo, file, bounds.StartLine, bounds.EndLine)
 }
 
 func parseTarget(target string) (file string, line, endLine int, err error) {
