@@ -32,17 +32,17 @@ archives:
 
 brews:
   - name: git-why
-    homepage: "https://github.com/chuy/git-why"
+    homepage: "https://github.com/blancochuy/git-why"
     description: "Understand why code exists, not just who wrote it"
     license: MIT
     repository:
-      owner: chuy
+      owner: blancochuy
       name: homebrew-tap
       branch: main
       token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
     commit_author:
-      name: chuy
-      email: chuy@example.com
+      name: blancochuy
+      email: [EMAIL_ADDRESS]
     directory: Formula
     test: |
       system "#{bin}/git-why --version"
@@ -51,9 +51,9 @@ brews:
 
 nfpms:
   - package_name: git-why
-    vendor: chuy
-    homepage: https://github.com/chuy/git-why
-    maintainer: chuy <chuy@example.com>
+    vendor: blancochuy
+    homepage: https://github.com/blancochuy/git-why
+    maintainer: blancochuy <chuy@example.com>
     description: Understand why code exists, not just who wrote it
     license: MIT
     formats:
@@ -76,7 +76,7 @@ changelog:
 
 release:
   github:
-    owner: chuy
+    owner: blancochuy
     name: git-why
   draft: false
   prerelease: auto

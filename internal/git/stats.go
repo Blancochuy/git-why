@@ -19,7 +19,6 @@ type FileStats struct {
 	TotalCommits int
 	Authors      []AuthorStats
 	LinesByMonth []MonthStats
-	HotLines     []HotLine
 }
 
 type MonthStats struct {
@@ -29,11 +28,7 @@ type MonthStats struct {
 	Deletions int
 }
 
-type HotLine struct {
-	LineNum int
-	Count   int
-	Authors []string
-}
+// HotLine struct removed
 
 func (r *Repo) Stats(file string) (*FileStats, error) {
 	blameOutput, err := r.runGit("blame", "--line-porcelain", file)
@@ -42,7 +37,6 @@ func (r *Repo) Stats(file string) (*FileStats, error) {
 	}
 
 	authorCounts := make(map[string]int)
-	lineAuthors := make(map[int]string)
 	lineNum := 0
 
 	scanner := bufio.NewScanner(strings.NewReader(blameOutput))
@@ -51,9 +45,11 @@ func (r *Repo) Stats(file string) (*FileStats, error) {
 
 		if strings.HasPrefix(line, "author ") {
 			author := strings.TrimPrefix(line, "author ")
+			if author == "Not Committed Yet" {
+				author = "(Uncommitted Changes)"
+			}
 			lineNum++
 			authorCounts[author]++
-			lineAuthors[lineNum] = author
 		}
 	}
 
@@ -87,14 +83,11 @@ func (r *Repo) Stats(file string) (*FileStats, error) {
 		months = nil
 	}
 
-	hotLines := r.findHotLines(lineAuthors, 5)
-
 	return &FileStats{
 		TotalLines:   totalLines,
 		TotalCommits: commitCount,
 		Authors:      authors,
 		LinesByMonth: months,
-		HotLines:     hotLines,
 	}, nil
 }
 
@@ -158,48 +151,4 @@ func (r *Repo) getMonthlyStats(file string) ([]MonthStats, error) {
 	return months, nil
 }
 
-func (r *Repo) findHotLines(lineAuthors map[int]string, topN int) []HotLine {
-	lineCounts := make(map[int]int)
-	lineAuthorList := make(map[int][]string)
-
-	for line, author := range lineAuthors {
-		lineCounts[line]++
-		if !contains(lineAuthorList[line], author) {
-			lineAuthorList[line] = append(lineAuthorList[line], author)
-		}
-	}
-
-	type lineStat struct {
-		line  int
-		count int
-	}
-
-	var stats []lineStat
-	for line, count := range lineCounts {
-		stats = append(stats, lineStat{line: line, count: count})
-	}
-
-	sort.Slice(stats, func(i, j int) bool {
-		return stats[i].count > stats[j].count
-	})
-
-	var hotLines []HotLine
-	for i := 0; i < topN && i < len(stats); i++ {
-		hotLines = append(hotLines, HotLine{
-			LineNum: stats[i].line,
-			Count:   stats[i].count,
-			Authors: lineAuthorList[stats[i].line],
-		})
-	}
-
-	return hotLines
-}
-
-func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
-}
+// Hotlines functions removed

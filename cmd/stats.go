@@ -71,7 +71,6 @@ func runStats(cmd *cobra.Command, args []string) error {
 	printStatsHeader(file, stats)
 	printTopAuthors(stats)
 	printMonthlyActivity(stats)
-	printHotLines(stats)
 
 	return nil
 }
@@ -100,10 +99,18 @@ func printTopAuthors(stats *git.FileStats) {
 		maxShow = len(stats.Authors)
 	}
 
+	maxAuthorLen := 20
+	for i := 0; i < maxShow; i++ {
+		if len(stats.Authors[i].Author) > maxAuthorLen {
+			maxAuthorLen = len(stats.Authors[i].Author)
+		}
+	}
+	authorFmt := fmt.Sprintf("  %%s@%%-%ds%%s %%s %%5.1f%%%% (%%d lines)\n", maxAuthorLen)
+
 	for i := 0; i < maxShow; i++ {
 		author := stats.Authors[i]
 		bar := statsProgressBar(author.Percentage, 20)
-		fmt.Printf("  %s@%-20s%s %s %5.1f%% (%d lines)\n",
+		fmt.Printf(authorFmt,
 			c.Author, author.Author, c.Reset,
 			bar,
 			author.Percentage, author.LinesCount,
@@ -142,35 +149,29 @@ func printMonthlyActivity(stats *git.FileStats) {
 		addBar := strings.Repeat("+", statsMin(m.Additions*20/maxChanges, barWidth))
 		delBar := strings.Repeat("-", statsMin(m.Deletions*20/maxChanges, 20-barWidth))
 
-		fmt.Printf("  %s %s%s%s%s%s%s %d changes\n",
+		green := "\033[32m"
+		red := "\033[31m"
+		reset := "\033[0m"
+		if plainOutput {
+			green = ""
+			red = ""
+			reset = ""
+		}
+
+		barDisplay := fmt.Sprintf("%s%s%s%s%s%s", green, addBar, reset, red, delBar, reset)
+		barLen := len(addBar) + len(delBar)
+		padding := strings.Repeat(" ", 20-barLen)
+
+		fmt.Printf("  %s %s%s %5d changes\n",
 			m.Month.Format("Jan 2006"),
-			"\033[32m", addBar, "\033[0m",
-			"\033[31m", delBar, "\033[0m",
+			barDisplay, padding,
 			total,
 		)
 	}
 	fmt.Println()
 }
 
-func printHotLines(stats *git.FileStats) {
-	if len(stats.HotLines) == 0 {
-		return
-	}
-
-	c := getStatsColors()
-
-	fmt.Printf("%sMost Changed Lines:%s\n", c.Header, c.Reset)
-
-	for _, hl := range stats.HotLines {
-		authors := strings.Join(hl.Authors, ", ")
-		fmt.Printf("  Line %d: %s%d changes%s by %s\n",
-			hl.LineNum,
-			c.Date, hl.Count, c.Reset,
-			authors,
-		)
-	}
-	fmt.Println()
-}
+// render hotLines removed
 
 func statsProgressBar(percentage float64, width int) string {
 	filled := int(percentage * float64(width) / 100)
@@ -196,14 +197,12 @@ func outputStatsJSON(file string, stats *git.FileStats) error {
 		TotalCommits int               `json:"totalCommits"`
 		Authors      []git.AuthorStats `json:"authors"`
 		MonthlyData  []git.MonthStats  `json:"monthlyData,omitempty"`
-		HotLines     []git.HotLine     `json:"hotLines,omitempty"`
 	}{
 		File:         file,
 		TotalLines:   stats.TotalLines,
 		TotalCommits: stats.TotalCommits,
 		Authors:      stats.Authors,
 		MonthlyData:  stats.LinesByMonth,
-		HotLines:     stats.HotLines,
 	}
 
 	jsonData, err := json.MarshalIndent(output, "", "  ")

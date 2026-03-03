@@ -78,13 +78,13 @@ func parseBlameOutput(output string) (*BlameResult, error) {
 		}
 
 		if strings.HasPrefix(line, "author ") {
-			result.Author = strings.TrimPrefix(line, "author ")
+			result.Author = strings.TrimSpace(strings.TrimPrefix(line, "author "))
 		}
 		if strings.HasPrefix(line, "author-mail ") {
-			result.AuthorMail = strings.TrimPrefix(line, "author-mail ")
+			result.AuthorMail = strings.TrimSpace(strings.TrimPrefix(line, "author-mail "))
 		}
 		if strings.HasPrefix(line, "author-time ") {
-			ts := strings.TrimPrefix(line, "author-time ")
+			ts := strings.TrimSpace(strings.TrimPrefix(line, "author-time "))
 			if t, err := parseTimestamp(ts); err == nil {
 				result.Date = t
 			}
@@ -111,6 +111,7 @@ func (r *Repo) ShowCommit(hash string) (*CommitInfo, error) {
 }
 
 func parseCommitInfo(output string) (*CommitInfo, error) {
+	output = strings.ReplaceAll(output, "\r", "")
 	lines := strings.SplitN(output, "\n", 6)
 	if len(lines) < 5 {
 		return nil, fmt.Errorf("invalid commit info format")
