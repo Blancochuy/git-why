@@ -7,6 +7,7 @@ import (
 	"io"
 
 	"github.com/chuy/git-why/internal/git"
+	"github.com/chuy/git-why/internal/render"
 )
 
 type Server struct {
@@ -143,9 +144,13 @@ func (s *Server) callGitWhyContext(id interface{}, args json.RawMessage) {
 	}
 
 	if !s.repo.IsGitRepo() {
+		s.repo.SetDirFromFile(arguments.File)
+	}
+
+	if !s.repo.IsGitRepo() {
 		s.sendResponse(id, CallToolResult{
 			IsError: true,
-			Content: []Content{{Type: "text", Text: "Error: No es un repositorio de Git"}},
+			Content: []Content{{Type: "text", Text: "Error: No es un repositorio de Git en " + arguments.File}},
 		})
 		return
 	}
@@ -180,16 +185,8 @@ func (s *Server) callGitWhyContext(id interface{}, args json.RawMessage) {
 	diff, _ := s.repo.GetCommitDiff(blame.Hash)
 	commit.Diff = diff
 
-	// We use a temporary string buffer to simulate the renderer
-	textOutput = fmt.Sprintf("FILE: %s:%d\nCOMMIT: %s\nAUTHOR: %s\nDATE: %s\nSUMMARY: %s\n",
-		arguments.File, arguments.Line, blame.Hash, blame.Author, commit.Date.Format("2006-01-02"), commit.Message)
-
-	if commit.Body != "" {
-		textOutput += fmt.Sprintf("\n--- RATIONALE ---\n%s\n", commit.Body)
-	}
-	if commit.Diff != "" {
-		textOutput += fmt.Sprintf("\n--- DIFF ---\n%s\n", commit.Diff)
-	}
+	renderer := render.NewAIRenderer()
+	textOutput = renderer.GetContext(arguments.File, arguments.Line, blame, commit)
 
 	s.sendResponse(id, CallToolResult{
 		Content: []Content{{Type: "text", Text: textOutput}},
@@ -203,6 +200,10 @@ func (s *Server) callGitWhyStats(id interface{}, args json.RawMessage) {
 	if err := json.Unmarshal(args, &arguments); err != nil {
 		s.sendError(id, -32602, "Invalid arguments", nil)
 		return
+	}
+
+	if !s.repo.IsGitRepo() {
+		s.repo.SetDirFromFile(arguments.File)
 	}
 
 	stats, err := s.repo.Stats(arguments.File)

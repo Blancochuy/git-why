@@ -43,21 +43,24 @@ func TestAIRenderer_RenderContext(t *testing.T) {
 	output := buf.String()
 
 	expectedSubstrings := []string{
+		"ID: abcdef123456 | 2024-01-01 | @testauthor",
 		"FILE: test.go:10",
-		"COMMIT: abcdef1234567890",
-		"AUTHOR: testauthor",
-		"DATE: 2024-01-01",
-		"SUMMARY: feat: test feature",
+		"MSG: feat: test feature",
 		"--- RATIONALE ---",
 		"This is a test body.",
 		"--- DIFF ---",
 		"+added line",
-		"--- END CONTEXT ---",
 	}
 
 	for _, sub := range expectedSubstrings {
 		if !strings.Contains(output, sub) {
 			t.Errorf("Expected output to contain %q, but it didn't.\nOutput:\n%s", sub, output)
 		}
+	}
+
+	// Verify noise is gone
+	noisyHeader := "diff --git"
+	if strings.Contains(output, noisyHeader) {
+		t.Errorf("Output still contains noisy header %q, but it should be cleaned.", noisyHeader)
 	}
 }

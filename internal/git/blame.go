@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"os/exec"
+	"path/filepath"
 	"regexp"
 	"strings"
 	"time"
@@ -32,6 +33,7 @@ type CommitInfo struct {
 
 type Repo struct {
 	gitPath string
+	Dir     string
 }
 
 func NewRepo() *Repo {
@@ -40,6 +42,9 @@ func NewRepo() *Repo {
 
 func (r *Repo) runGit(args ...string) (string, error) {
 	cmd := exec.Command(r.gitPath, args...)
+	if r.Dir != "" {
+		cmd.Dir = r.Dir
+	}
 	var stdout, stderr bytes.Buffer
 	cmd.Stdout = &stdout
 	cmd.Stderr = &stderr
@@ -53,6 +58,12 @@ func (r *Repo) runGit(args ...string) (string, error) {
 func (r *Repo) IsGitRepo() bool {
 	_, err := r.runGit("rev-parse", "--is-inside-work-tree")
 	return err == nil
+}
+
+func (r *Repo) SetDirFromFile(file string) {
+	if abs, err := filepath.Abs(file); err == nil {
+		r.Dir = filepath.Dir(abs)
+	}
 }
 
 func (r *Repo) Blame(file string, lineNum int) (*BlameResult, error) {
