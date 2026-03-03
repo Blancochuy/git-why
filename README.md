@@ -76,18 +76,24 @@ git-why src/auth.ts:142 --plain   # No colors (for pipes)
 git-why stats src/auth.ts
 ```
 
-## Features
+## Roadmap / Features
 
+### Core Features (MVP)
 - [x] Single line blame with full commit context
 - [x] Range of lines history
 - [x] Compact one-line output (`--short`)
 - [x] Configurable context lines (`--context`)
 - [x] Multiple output formats (JSON, Markdown, plain)
-- [ ] Function/block detection (`--fn`)
-- [ ] Search in commit history (`--search`)
-- [ ] GitHub/GitLab PR integration
-- [ ] AI-powered summaries (local via Ollama)
-- [ ] Watch mode for editor integration
+
+### Advanced Features
+- [x] Function/block detection (`--fn`) — Go, TS/JS, Python, Java, Rust
+- [x] Search in commit history (`--search`) — Text + regex support
+- [ ] Watch mode for editor integration (`watch`)
+- [ ] AI-powered summaries (local via Ollama) — `--ai`
+- [ ] GitHub/GitLab PR & Issue integration — Auto-link commits to PRs
+- [ ] Semantic Tracing: `-C` (copy) and `-M` (move) detection
+- [ ] Shell completions (Bash, Zsh, Fish)
+- [ ] Author statistics and heatmap (`stats`)
 
 ## Building from source
 
