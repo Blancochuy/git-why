@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 
+	"github.com/blancochuy/git-why/internal/enricher"
 	"github.com/blancochuy/git-why/internal/git"
 	"github.com/blancochuy/git-why/internal/render"
 )
@@ -175,6 +176,19 @@ func (s *Server) callGitWhyContext(id interface{}, args json.RawMessage) {
 
 	diff, _ := s.repo.GetCommitDiff(blame.Hash)
 	commit.Diff = diff
+
+	// Enrich with GitHub PR data if origin is GitHub
+	remoteURL, err := s.repo.GetRemoteURL("origin")
+	if err == nil && remoteURL != "" {
+		owner, repoName, err := enricher.ParseGitHubRemote(remoteURL)
+		if err == nil && owner != "" && repoName != "" {
+			ghClient := enricher.NewGitHubClient("")
+			if pr, _ := ghClient.GetPRForCommit(owner, repoName, commit.Hash); pr != nil {
+				commit.PRURL = pr.HTMLURL
+				commit.PRBody = pr.Body
+			}
+		}
+	}
 
 	renderer := render.NewAIRenderer()
 	textOutput := renderer.GetContext(arguments.File, arguments.Line, blame, commit)

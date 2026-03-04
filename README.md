@@ -1,5 +1,10 @@
 # git-why
 
+[![CI](https://github.com/blancochuy/git-why/actions/workflows/ci.yml/badge.svg)](https://github.com/blancochuy/git-why/actions/workflows/ci.yml)
+[![Go Report Card](https://goreportcard.com/badge/github.com/blancochuy/git-why)](https://goreportcard.com/report/github.com/blancochuy/git-why)
+[![GitHub release (latest by date)](https://img.shields.io/github/v/release/blancochuy/git-why)](https://github.com/blancochuy/git-why/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+
 Understand why code exists, not just who wrote it.
 
 `git-why` adds historical context to `git blame` by combining blame, commit details, and targeted history queries.

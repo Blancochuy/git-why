@@ -28,6 +28,13 @@ func (r *AIRenderer) GetContext(file string, line int, blame *git.BlameResult, c
 		sb.WriteString(fmt.Sprintf("\n--- RATIONALE ---\n%s\n", strings.TrimSpace(commit.Body)))
 	}
 
+	if commit.PRURL != "" {
+		sb.WriteString(fmt.Sprintf("\n--- GITHUB PR (%s) ---\n", commit.PRURL))
+		if strings.TrimSpace(commit.PRBody) != "" {
+			sb.WriteString(fmt.Sprintf("%s\n", strings.TrimSpace(commit.PRBody)))
+		}
+	}
+
 	if commit.Diff != "" {
 		sb.WriteString("\n--- DIFF ---\n")
 		sb.WriteString(r.cleanDiff(commit.Diff))
@@ -49,5 +56,21 @@ func (r *AIRenderer) cleanDiff(diff string) string {
 		}
 		cleaned = append(cleaned, line)
 	}
-	return strings.Join(cleaned, "\n")
+
+	diffText := strings.Join(cleaned, "\n")
+
+	// Truncate to avoid AI context window blowup
+	maxLines := 500
+	maxChars := 15000
+
+	if len(cleaned) > maxLines {
+		truncated := strings.Join(cleaned[:maxLines], "\n")
+		return truncated + "\n\n[... Diff truncated for AI context limits ...]"
+	}
+
+	if len(diffText) > maxChars {
+		return diffText[:maxChars] + "\n\n[... Diff truncated for AI context limits ...]"
+	}
+
+	return diffText
 }

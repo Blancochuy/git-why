@@ -29,6 +29,8 @@ type CommitInfo struct {
 	Message     string
 	Body        string
 	Diff        string
+	PRURL       string
+	PRBody      string
 }
 
 type Repo struct {
@@ -66,9 +68,21 @@ func (r *Repo) SetDirFromFile(file string) {
 	}
 }
 
+func (r *Repo) GetRemoteURL(remoteName string) (string, error) {
+	if remoteName == "" {
+		remoteName = "origin"
+	}
+	output, err := r.runGit("config", "--get", "remote."+remoteName+".url")
+	if err != nil {
+		return "", err
+	}
+	return strings.TrimSpace(output), nil
+}
+
 func (r *Repo) Blame(file string, lineNum int) (*BlameResult, error) {
 	rangeArg := fmt.Sprintf("-L%d,%d", lineNum, lineNum)
-	output, err := r.runGit("blame", "--porcelain", rangeArg, file)
+	// Add flags for Deep Blame: -w (ignore whitespace), -M (moves in same file), -C -C -C (copies across files)
+	output, err := r.runGit("blame", "--porcelain", "-w", "-M", "-C", "-C", "-C", rangeArg, file)
 	if err != nil {
 		return nil, err
 	}
