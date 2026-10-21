@@ -35,7 +35,7 @@ archives:
 # so a GitHub release of the binaries still succeeds before the tap exists.
 homebrew_casks:
   - name: git-why
-    skip_upload: '{{ eq .Env.HOMEBREW_TAP_GITHUB_TOKEN "" }}'
+    skip_upload: '{{ eq (index .Env "HOMEBREW_TAP_GITHUB_TOKEN") "" }}'
     homepage: "https://github.com/Blancochuy/git-why"
     description: "Understand why code exists, not just who wrote it"
     license: MIT
@@ -43,7 +43,7 @@ homebrew_casks:
       owner: Blancochuy
       name: homebrew-tap
       branch: main
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+      token: '{{ index .Env "HOMEBREW_TAP_GITHUB_TOKEN" }}'
     commit_author:
       name: blancochuy
       email: contact@blancochuy.dev
