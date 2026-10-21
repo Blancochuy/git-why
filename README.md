@@ -10,7 +10,15 @@
 
 Understand why code exists, not just who wrote it. `git-why` brings together line attribution, commit messages, and history in a Go CLI, with an MCP server for coding agents.
 
-[Installation](#installation) · [Quick start](#quick-start) · [Commands](#commands) · [MCP integration](#mcp-integration) · [Development](#development)
+[Demo](#demo) · [Installation](#installation) · [Quick start](#quick-start) · [Commands](#commands) · [MCP integration](#mcp-integration) · [Development](#development)
+
+## Demo
+
+Trace a line, follow a function, and retrieve context for a coding agent in under 20 seconds.
+
+![Animated terminal demo showing line attribution, function history, and agent-oriented output from git-why](assets/git-why-demo.gif)
+
+Rendered from real v0.1.0 CLI output with animated typing. The final scene shows an output excerpt. See the [text examples](#quick-start) or [reproduce the demo](assets/DEMO.md).
 
 ## Why git-why?
 
