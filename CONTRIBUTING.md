@@ -19,7 +19,7 @@ go build -o git-why .
 
 ## Development Workflow
 
-1. Create a branch from the default branch. That branch is `feature/ai-integration` until it is renamed to `main`.
+1. Create a branch from the default branch, `main`.
 2. Add or update tests for your change.
 3. Run local checks.
 4. Open a pull request.

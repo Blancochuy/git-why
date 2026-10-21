@@ -165,7 +165,7 @@ Point an MCP client at the binary:
 
 ## Installation
 
-There is no tagged release yet, so there are no published binaries and `brew install` does not work.
+Install with Go or download a binary from [GitHub Releases](https://github.com/Blancochuy/git-why/releases). Homebrew requires the optional tap setup described below.
 
 ### Go install
 
@@ -175,7 +175,7 @@ The module path is lowercase and must match `go.mod`. The GitHub owner is `Blanc
 go install github.com/blancochuy/git-why@latest
 ```
 
-With no semver tags, `@latest` is the tip of the default branch (`feature/ai-integration` until it is renamed to `main`).
+`@latest` selects the latest published release. To install this release explicitly, use `go install github.com/blancochuy/git-why@v0.1.0`.
 
 ### From a clone
 
@@ -185,7 +185,7 @@ cd git-why
 go install .
 ```
 
-### Binaries and Homebrew, after the first tag
+### Binaries and optional Homebrew setup
 
 Tagging `v0.1.0` (or any `v*`) runs [`.github/workflows/release.yml`](.github/workflows/release.yml). GoReleaser builds linux, darwin, and windows archives (amd64 and arm64) and attaches them to the GitHub release. The config is checked against GoReleaser v2.18.3.
 
@@ -237,7 +237,7 @@ CI runs those three commands on Ubuntu for pushes and pull requests to `main` an
 
 ## Project status
 
-Not released. The first tag will be `v0.1.0`. The default branch is `feature/ai-integration`.
+The default branch is `main`. Release history and binary downloads are available on [GitHub Releases](https://github.com/Blancochuy/git-why/releases).
 
 `git-why --version` prints `dev` until a release build sets the version with `-ldflags`.
 

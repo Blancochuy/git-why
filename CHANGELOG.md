@@ -5,10 +5,7 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-No version has been tagged yet. The section below is the planned first release.
-Tagging `v0.1.0` publishes the GitHub release.
-
-## [Unreleased]
+## [0.1.0] - 2026-10-21
 
 ### Added
 - Initial git-why CLI
@@ -29,6 +26,6 @@ Tagging `v0.1.0` publishes the GitHub release.
 ### Notes
 - Requires Git on `PATH`
 - Go 1.23 or newer
-- Release archives target linux, darwin, and windows (amd64 and arm64) once `v0.1.0` is tagged
+- Release archives target linux, darwin, and windows (amd64 and arm64)
 - GitHub and GitLab API responses are cached under `~/.cache/git-why` (override with `GITWHY_CACHE_DIR`)
 - The GitLab client is implemented but not called by the CLI yet
