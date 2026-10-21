@@ -1,143 +1,132 @@
 # git-why
 
-[![CI](https://github.com/Blancochuy/git-why/actions/workflows/ci.yml/badge.svg)](https://github.com/Blancochuy/git-why/actions/workflows/ci.yml)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+![git-why: historical context for developers and coding agents, illustrated with Git history converging on source code](assets/git-why-banner.png)
 
-Understand why code exists, not just who wrote it.
+**Historical context for developers and coding agents.**
 
-`git-why` adds historical context to `git blame`: the commit that introduced a line, the message and body that explain it, and the commits that touched a range or a function. It also runs as an MCP server so an agent can ask the same questions.
+[![CI](https://github.com/Blancochuy/git-why/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/Blancochuy/git-why/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/Blancochuy/git-why)](https://github.com/Blancochuy/git-why/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 
-It needs Git on `PATH`.
+Understand why code exists, not just who wrote it. `git-why` brings together line attribution, commit messages, and history in a Go CLI, with an MCP server for coding agents.
 
-## Demo
+[Installation](#installation) · [Quick start](#quick-start) · [Commands](#commands) · [MCP integration](#mcp-integration) · [Development](#development)
 
-These commands were run from this repository with a locally built binary (`go build -o git-why .`). Output below is copied from that run. Dates use the local timezone of that machine, which was UTC.
+## Why git-why?
 
-### Line
+A line of code shows what happens today. Its history can explain the constraint, bug, or decision behind it. `git-why` retrieves that evidence so you can investigate an unfamiliar codebase or give a coding agent more context before a change.
+
+- **Trace a line** to its attributed commit, author, message, and body.
+- **Explore a range or function** through the commits that changed it.
+- **Give agents historical evidence** through MCP or text output with `--llm`.
+
+The tool retrieves existing evidence. How much that evidence explains depends on the repository's history and commit messages.
+
+## Installation
+
+Git must be installed and available on `PATH`. Go 1.23 or newer is required when installing from source.
+
+### With Go
 
 ```bash
-git-why internal/render/ai_renderer.go:20 --plain
+go install github.com/blancochuy/git-why@latest
+git-why --version
 ```
 
-```text
+Use the lowercase module path shown above. Add your Go binary directory to `PATH` if `git-why` is not found. By default, that directory is `$(go env GOPATH)/bin`, unless `GOBIN` is set.
 
+To install a specific version:
+
+```bash
+go install github.com/blancochuy/git-why@v0.1.0
+```
+
+### Prebuilt binaries
+
+Download an archive from [GitHub Releases](https://github.com/Blancochuy/git-why/releases), extract it, and place `git-why` or `git-why.exe` in a directory on `PATH`.
+
+| Platform | Architectures | Archive |
+| --- | --- | --- |
+| Linux | amd64, arm64 | `.tar.gz` |
+| macOS | amd64, arm64 | `.tar.gz` |
+| Windows | amd64, arm64 | `.zip` |
+
+Releases include SHA-256 checksums and Linux `.deb` and `.rpm` packages. Homebrew installation is not currently available.
+
+## Quick start
+
+Run commands from the root of a Git repository. These examples use files in this project:
+
+```bash
+# Inspect a line
+git-why internal/render/ai_renderer.go:20 --plain
+
+# Follow the history of a range
+git-why internal/render/ai_renderer.go:20-44
+
+# Find commits that changed a function
+git-why internal/render/ai_renderer.go --fn GetContext
+```
+
+The first command produces this output with the published v0.1.0 binary:
+
+```text
 Line 20 - 1e08ea65b536 - Added: 2026-03-03 by @jesus
 
 Message:
   chore: optimize AI output for token efficiency and clean up diff headers
 ```
 
-### Function
+Dates are displayed in the local timezone and can vary by machine.
+
+## Commands
+
+| Task | Command |
+| --- | --- |
+| Inspect a line | `git-why <file>:<line>` |
+| Follow a range | `git-why <file>:<start>-<end>` |
+| Follow a function | `git-why <file> --fn <name>` |
+| Search commit messages | `git-why search <file> --term <text>` |
+| Search with a regular expression | `git-why search <file> --term <pattern> --regex` |
+| View file authorship and activity | `git-why stats <file>` |
+| Read line numbers from stdin | `git-why watch <file>` |
+| Start the MCP server | `git-why mcp` |
+
+Line numbers start at 1. Function lookup uses patterns for Go, TypeScript, JavaScript, Python, Java, and Rust; it is not a full language parser. Commit search matches subjects and bodies, without searching patch contents.
 
 ```bash
-git-why internal/render/ai_renderer.go --fn GetContext --plain
+git-why search internal/render/ai_renderer.go --term "token"
+git-why stats internal/render/ai_renderer.go --json
+git-why --help
 ```
 
-```text
-Function GetContext() in internal/render/ai_renderer.go (lines 20-44):
+Generate shell completions with `git-why completion bash`. Also available: `zsh`, `fish`, and `powershell`.
 
-Commits that modified internal/render/ai_renderer.go:20-44:
+### Output formats
 
-  ea3c55e 2026-03-04 - Chuy
-    feat: Implement Git blame and commit retrieval, integrate GitHub API for commit enrichment, and add project badges to README.
+For line, range, and function queries, choose one output mode:
 
-  1e08ea6 2026-03-03 - jesus
-    chore: optimize AI output for token efficiency and clean up diff headers
+| Flag | Output |
+| --- | --- |
+| `--plain` | Terminal text without ANSI colors |
+| `--short` | One line per commit |
+| `--json` | Structured JSON |
+| `--md` | Markdown |
+| `--llm` | Text formatted for a consuming agent |
 
-  14ffd42 2026-03-03 - jesus
-    feat: implement AI context optimized flags and MCP server
-```
-
-### MCP
-
-`git-why mcp` speaks JSON-RPC on stdin/stdout. One request per line:
+Single-line queries include the commit patch with `--include-diff`. The `--llm` mode includes it automatically. Range and function queries list commits rather than inline patches.
 
 ```bash
-printf '%s\n' \
-  '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' \
-  '{"jsonrpc":"2.0","id":2,"method":"tools/call","params":{"name":"git-why-context","arguments":{"file":"internal/render/ai_renderer.go","line":20}}}' \
-  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"git-why-stats","arguments":{"file":"internal/render/ai_renderer.go"}}}' \
-  | git-why mcp
+git-why internal/render/ai_renderer.go:20 --json
+git-why internal/render/ai_renderer.go:20-44 --md
+git-why internal/render/ai_renderer.go:20 --llm
 ```
 
-`tools/list` responded with this object (pretty-printed here; on the wire it is a single line):
+## MCP integration
 
-```json
-{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "result": {
-        "tools": [
-            {
-                "name": "git-why-context",
-                "description": "Explain the historical intent of a line or range of lines using Git context.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "file": {
-                            "type": "string",
-                            "description": "Path to the file (relative to the repository root)"
-                        },
-                        "line": {
-                            "type": "integer",
-                            "description": "Specific line number (1-indexed)"
-                        },
-                        "range": {
-                            "type": "string",
-                            "description": "Line range such as 10-20. When set, this is used instead of line."
-                        }
-                    },
-                    "required": [
-                        "file"
-                    ]
-                }
-            },
-            {
-                "name": "git-why-stats",
-                "description": "Show authorship and historical change statistics for a specific file.",
-                "inputSchema": {
-                    "type": "object",
-                    "properties": {
-                        "file": {
-                            "type": "string",
-                            "description": "Path to the file"
-                        }
-                    },
-                    "required": [
-                        "file"
-                    ]
-                }
-            }
-        ]
-    }
-}
-```
+The MCP server exposes repository history to a compatible client over stdin/stdout. It does not require a model API key or call a model itself.
 
-`git-why-context` for that line started with:
-
-```text
-ID: 1e08ea65b536 | 2026-03-03 | @jesus
-FILE: internal/render/ai_renderer.go:20
-MSG: chore: optimize AI output for token efficiency and clean up diff headers
-
---- DIFF ---
-```
-
-The rest of that result is the commit diff (187 lines, including a `git-why.exe` binary delta from that commit). It is omitted here.
-
-`git-why-stats` returned:
-
-```text
-Stats for internal/render/ai_renderer.go
-Total Lines: 76
-Total Commits: 4
-
-Contributors:
-- jesus: 51 lines (67.1%)
-- Chuy: 25 lines (32.9%)
-```
-
-Point an MCP client at the binary:
+Install the binary, then add this entry to your client's MCP configuration:
 
 ```json
 {
@@ -150,111 +139,86 @@ Point an MCP client at the binary:
 }
 ```
 
-## Features
+Configure the client to launch the server with the target repository root as its working directory. If the client cannot find `git-why` on `PATH`, use the absolute path to the binary in `command`. Configuration file locations and working-directory settings depend on the client.
 
-- Line context: `git-why <file>:<line>`
-- Range history: `git-why <file>:<start>-<end>`
-- Function history: `git-why <file> --fn <function>` (Go, TypeScript/JavaScript, Python, Java, Rust)
-- Commit search: `git-why search <file> --term <text>` (subject and body; not the diff)
-- File statistics: `git-why stats <file>`
-- Output formats: `--json`, `--md`, `--plain`, `--short`, `--llm`
-- Optional patch on a single line: `--include-diff` (also included by `--llm`)
-- MCP server: `git-why mcp`
+### Available tools
 
-`--json`, `--md`, and `--llm` work for a line and for a range. `--llm` on a range lists the commits instead of inlining a diff.
+| Tool | Arguments | Result |
+| --- | --- | --- |
+| `git-why-context` | `file` and either `line` or `range` | Commit context for a line, or commit history for a range |
+| `git-why-stats` | `file` | Line counts, commit counts, and contributor attribution |
 
-## Installation
+Paths are relative to the repository root. A `range` uses the form `"10-20"` and takes precedence when both `line` and `range` are supplied.
 
-Install with Go or download a binary from [GitHub Releases](https://github.com/Blancochuy/git-why/releases). Homebrew requires the optional tap setup described below.
+Single-line context includes commit metadata and a patch. When `origin` points to GitHub, it also attempts to retrieve an associated pull request. Range responses list commit metadata.
 
-### Go install
+### Configuration
 
-The module path is lowercase and must match `go.mod`. The GitHub owner is `Blancochuy`; `go install` with that capital B fails because Go module paths are case-sensitive.
+| Environment variable | Purpose |
+| --- | --- |
+| `GITHUB_TOKEN` | Authenticate optional GitHub PR lookups |
+| `GITWHY_TOKEN` | Fallback when `GITHUB_TOKEN` is unset |
+| `GITWHY_CACHE_DIR` | Override the API cache directory, which defaults to `~/.cache/git-why` |
 
-```bash
-go install github.com/blancochuy/git-why@latest
-```
+CLI history queries use local Git data. MCP single-line queries can contact GitHub for PR enrichment, sending the repository identifiers and commit SHA. Retrieved commit messages and PR text are evidence for the consuming agent to assess.
 
-`@latest` selects the latest published release. To install this release explicitly, use `go install github.com/blancochuy/git-why@v0.1.0`.
+<details>
+<summary>Test the stdio protocol manually</summary>
 
-### From a clone
-
-```bash
-git clone https://github.com/Blancochuy/git-why.git
-cd git-why
-go install .
-```
-
-### Binaries and optional Homebrew setup
-
-Tagging `v0.1.0` (or any `v*`) runs [`.github/workflows/release.yml`](.github/workflows/release.yml). GoReleaser builds linux, darwin, and windows archives (amd64 and arm64) and attaches them to the GitHub release. The config is checked against GoReleaser v2.18.3.
-
-Homebrew (`brew install blancochuy/tap/git-why`) also needs:
-
-1. A repository `Blancochuy/homebrew-tap` (it does not exist yet).
-2. A `HOMEBREW_TAP_GITHUB_TOKEN` secret that can push to that repository.
-
-Until that secret is set, the release workflow still publishes the binaries and skips the tap. Do not run the `brew` command before then.
-
-## Quick start
+The server reads one JSON-RPC message per line. This Bash example initializes a session, discovers tools, and requests a range:
 
 ```bash
-git-why internal/render/ai_renderer.go:20
-git-why internal/render/ai_renderer.go:20-44
-git-why internal/render/ai_renderer.go --fn GetContext
-git-why search internal/render/ai_renderer.go --term "token"
-git-why stats internal/render/ai_renderer.go
+printf '%s\n' \
+  '{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"manual-test","version":"1.0"}}}' \
+  '{"jsonrpc":"2.0","method":"notifications/initialized"}' \
+  '{"jsonrpc":"2.0","id":2,"method":"tools/list"}' \
+  '{"jsonrpc":"2.0","id":3,"method":"tools/call","params":{"name":"git-why-context","arguments":{"file":"internal/render/ai_renderer.go","range":"20-44"}}}' \
+  | git-why mcp
 ```
 
-## Output
+Each response is a JSON object on a single line. The initialization notification does not produce a response.
 
-```bash
-git-why internal/render/ai_renderer.go:20 --short
-git-why internal/render/ai_renderer.go:20 --json
-git-why internal/render/ai_renderer.go:20 --md
-git-why internal/render/ai_renderer.go:20 --plain
-git-why internal/render/ai_renderer.go:20 --llm --include-diff
-```
-
-Shell completions are the standard Cobra ones: `git-why completion bash` (also `zsh`, `fish`, `powershell`).
-
-## MCP tools
-
-- `git-why-context`: commit context for a line, or the commits in a `range` such as `10-20`. If both are set, `range` is used. When `origin` is a GitHub remote, a linked pull request is included when the API returns one.
-- `git-why-stats`: authorship and commit counts for a file.
-
-GitHub enrichment uses `GITHUB_TOKEN` or `GITWHY_TOKEN` when set. The GitLab client in `internal/enricher` is not wired up yet.
+</details>
 
 ## Development
 
 ```bash
+git clone https://github.com/Blancochuy/git-why.git
+cd git-why
 go test -race ./...
 go vet ./...
 go build -o git-why .
 ```
 
-CI runs those three commands on Ubuntu for pushes and pull requests to `main` and `feature/ai-integration`.
+CI runs tests with the race detector, `go vet`, and a build on Ubuntu. Release builds target Linux, macOS, and Windows. Source builds report `dev` unless version metadata is supplied at build time.
 
-## Project status
+### Code layout
 
-The default branch is `main`. Release history and binary downloads are available on [GitHub Releases](https://github.com/Blancochuy/git-why/releases).
+| Directory | Responsibility |
+| --- | --- |
+| [`cmd/`](cmd/) | CLI commands and output selection |
+| [`internal/git/`](internal/git/) | Git execution, history parsing, and function lookup |
+| [`internal/mcp/`](internal/mcp/) | MCP transport and tool handlers |
+| [`internal/render/`](internal/render/) | Terminal and agent-oriented context rendering |
+| [`internal/enricher/`](internal/enricher/) | Hosting API clients; GitHub PR lookup is wired into MCP |
+| [`internal/cache/`](internal/cache/) | API response caching |
 
-`git-why --version` prints `dev` until a release build sets the version with `-ldflags`.
+### Current limits
 
-## Roadmap
+- Available history determines the context the tool can retrieve. Shallow clones may omit relevant commits.
+- A line with uncommitted changes returns an error because it has no committed attribution.
+- Agent-oriented single-line patches can be truncated. Range responses do not include full patches or PR enrichment.
+- The GitLab API client exists but is not connected to commands or MCP handlers.
+- MCP handlers are tested over stdio. Desktop client compatibility has not been verified end to end.
 
-- Editor integrations for watch mode
-- Call the GitLab enricher the same way GitHub pull requests are attached
-- Publish the Homebrew cask once the tap exists
+See the [changelog](CHANGELOG.md) for release history and the [release workflow](.github/workflows/release.yml) for publishing configuration.
 
 ## Contributing
 
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+Bug reports and contributions are welcome. Read the [contribution guide](CONTRIBUTING.md), use the [support guide](SUPPORT.md) for questions, and follow the [code of conduct](CODE_OF_CONDUCT.md).
 
-## Security
-
-See [SECURITY.md](SECURITY.md).
+Report security issues through the process in [SECURITY.md](SECURITY.md).
 
 ## License
 
-MIT. See [LICENSE](LICENSE).
+[MIT](LICENSE).
