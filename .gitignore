@@ -1,5 +1,6 @@
 # Binaries
 /git-why
+/dist/
 *.exe
 *.exe~
 *.dll
