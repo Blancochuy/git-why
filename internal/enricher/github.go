@@ -171,23 +171,23 @@ func (c *GitHubClient) GetIssue(owner, repo string, number int) (*Issue, error) 
 }
 
 func ParseGitHubRemote(remoteURL string) (owner, repo string, err error) {
+	remoteURL = strings.TrimSpace(remoteURL)
 	remoteURL = strings.TrimSuffix(remoteURL, ".git")
 	remoteURL = strings.TrimSuffix(remoteURL, "/")
 
 	if strings.HasPrefix(remoteURL, "git@github.com:") {
 		parts := strings.Split(strings.TrimPrefix(remoteURL, "git@github.com:"), "/")
-		if len(parts) >= 2 {
+		if len(parts) >= 2 && parts[0] != "" && parts[1] != "" {
 			return parts[0], parts[1], nil
 		}
 	}
 
-	if strings.HasPrefix(remoteURL, "https://github.com/") {
-		u, err := url.Parse(remoteURL)
-		if err != nil {
-			return "", "", err
-		}
+	// url.Parse covers https://github.com/owner/repo and credentialed URLs
+	// such as https://x-access-token:TOKEN@github.com/owner/repo.
+	u, parseErr := url.Parse(remoteURL)
+	if parseErr == nil && strings.EqualFold(u.Host, "github.com") {
 		parts := strings.Split(strings.Trim(u.Path, "/"), "/")
-		if len(parts) >= 2 {
+		if len(parts) >= 2 && parts[0] != "" && parts[1] != "" {
 			return parts[0], parts[1], nil
 		}
 	}

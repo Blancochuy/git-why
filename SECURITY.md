@@ -2,7 +2,7 @@
 
 ## Supported Versions
 
-Security fixes are applied to the latest release on `main`.
+Security fixes are applied on the default branch. There is no tagged release yet.
 
 ## Reporting a Vulnerability
 

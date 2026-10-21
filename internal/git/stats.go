@@ -28,8 +28,6 @@ type MonthStats struct {
 	Deletions int
 }
 
-// HotLine struct removed
-
 func (r *Repo) Stats(file string) (*FileStats, error) {
 	blameOutput, err := r.runGit("blame", "--line-porcelain", file)
 	if err != nil {
@@ -150,5 +148,3 @@ func (r *Repo) getMonthlyStats(file string) ([]MonthStats, error) {
 
 	return months, nil
 }
-
-// Hotlines functions removed

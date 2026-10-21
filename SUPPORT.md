@@ -2,7 +2,7 @@
 
 ## Questions and Usage Help
 
-Open a GitHub Discussion or issue for usage questions and troubleshooting.
+Open a GitHub issue for usage questions and troubleshooting. Use the bug report or feature request template.
 
 ## Bug Reports
 

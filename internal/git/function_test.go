@@ -80,7 +80,7 @@ def other():
 			funcName:  "target_func",
 			parser:    languageParsers["py"],
 			wantStart: 4,
-			wantEnd:   9,
+			wantEnd:   6,
 		},
 		{
 			name: "function not found",

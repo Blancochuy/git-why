@@ -1,9 +1,10 @@
+version: 2
+
 project_name: git-why
 
 before:
   hooks:
     - go mod tidy
-    - go generate ./...
 
 builds:
   - env:
@@ -20,70 +21,78 @@ builds:
     binary: git-why
 
 archives:
-  - format: tar.gz
-    name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+  - name_template: "{{ .ProjectName }}_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    formats: [tar.gz]
     format_overrides:
       - goos: windows
-        format: zip
+        formats: [zip]
     files:
       - README.md
       - LICENSE
       - CHANGELOG.md
 
-brews:
+# Homebrew publishing is skipped unless HOMEBREW_TAP_GITHUB_TOKEN is set,
+# so a GitHub release of the binaries still succeeds before the tap exists.
+homebrew_casks:
   - name: git-why
-    homepage: "https://github.com/blancochuy/git-why"
+    skip_upload: '{{ eq (index .Env "HOMEBREW_TAP_GITHUB_TOKEN") "" }}'
+    homepage: "https://github.com/Blancochuy/git-why"
     description: "Understand why code exists, not just who wrote it"
     license: MIT
     repository:
-      owner: blancochuy
+      owner: Blancochuy
       name: homebrew-tap
       branch: main
-      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
+      token: '{{ index .Env "HOMEBREW_TAP_GITHUB_TOKEN" }}'
     commit_author:
       name: blancochuy
-      email: chuy@blancochuy.dev
-    directory: Formula
-    test: |
-      system "#{bin}/git-why --version"
-    install: |
-      bin.install "git-why"
+      email: contact@blancochuy.dev
+    directory: Casks
+    dependencies:
+      - formula: git
+    hooks:
+      post:
+        install: |
+          if OS.mac?
+            system_command "/usr/bin/xattr", args: ["-dr", "com.apple.quarantine", "#{staged_path}/git-why"]
+          end
 
 nfpms:
   - package_name: git-why
     vendor: blancochuy
-    homepage: https://github.com/blancochuy/git-why
-    maintainer: blancochuy <chuy@example.com>
+    homepage: https://github.com/Blancochuy/git-why
+    maintainer: blancochuy <contact@blancochuy.dev>
     description: Understand why code exists, not just who wrote it
     license: MIT
     formats:
       - deb
       - rpm
-      - archlinux
+    dependencies:
+      - git
 
 checksum:
-  name_template: 'checksums.txt'
+  name_template: "checksums.txt"
 
 changelog:
   sort: asc
   filters:
     exclude:
-      - '^docs:'
-      - '^test:'
-      - '^ci:'
+      - "^docs:"
+      - "^test:"
+      - "^ci:"
       - Merge pull request
       - Merge branch
 
 release:
   github:
-    owner: blancochuy
+    owner: Blancochuy
     name: git-why
   draft: false
   prerelease: auto
   name_template: "{{.ProjectName}} v{{.Version}}"
   header: |
     ## git-why {{.Version}}
-    
+
     See [CHANGELOG.md](CHANGELOG.md) for details.
   footer: |
-    **Full Changelog**: https://github.com/blancochuy/git-why/compare/{{ .PreviousTag }}...{{ .Tag }}
+    **Full Changelog**: https://github.com/Blancochuy/git-why/compare/{{ .PreviousTag }}...{{ .Tag }}

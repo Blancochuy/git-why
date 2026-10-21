@@ -1,6 +1,7 @@
 package git
 
 import (
+	"strings"
 	"testing"
 	"time"
 
@@ -56,6 +57,9 @@ boundary
 			assert.Equal(t, tt.expected.Author, result.Author)
 			assert.Equal(t, tt.expected.AuthorMail, result.AuthorMail)
 			assert.Equal(t, tt.expected.Line, result.Line)
+			assert.Equal(t, 42, result.OriginalLineNum)
+			assert.Equal(t, 42, result.FinalLineNum)
+			assert.True(t, result.Date.Equal(time.Unix(1723680000, 0)))
 		})
 	}
 }
@@ -165,6 +169,34 @@ b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f0a1b2c3|Ana Martínez|1723593600|fix: another v
 			assert.Len(t, result, tt.expected)
 		})
 	}
+}
+
+func TestIsUncommitted(t *testing.T) {
+	assert.True(t, IsUncommitted(strings.Repeat("0", 40)))
+	assert.False(t, IsUncommitted(""))
+	assert.False(t, IsUncommitted("a3f92c1a2b4c3d4e5f6a7b8c9d0e1f2a3b4c5d6e"))
+}
+
+func TestFilterCommitsByTerm(t *testing.T) {
+	input := strings.Join([]string{
+		"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\x1fAda\x1f1723680000\x1ffeat: add parser\x1fExplains blame output.\n\nSecond paragraph mentions rotation.\x1e",
+		"bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\x1fBea\x1f1723593600\x1ffix: tests\x1fNo match here.\x1e",
+	}, "")
+
+	commits, err := filterCommitsByTerm(input, "rotation", false)
+	assert.NoError(t, err)
+	assert.Len(t, commits, 1)
+	assert.Equal(t, "Ada", commits[0].Author)
+	assert.Contains(t, commits[0].Body, "Second paragraph")
+	assert.True(t, commits[0].Date.Equal(time.Unix(1723680000, 0)))
+
+	commits, err = filterCommitsByTerm(input, "fix.*tests", true)
+	assert.NoError(t, err)
+	assert.Len(t, commits, 1)
+	assert.Equal(t, "Bea", commits[0].Author)
+
+	_, err = filterCommitsByTerm(input, "(", true)
+	assert.Error(t, err)
 }
 
 func TestParseTimestamp(t *testing.T) {

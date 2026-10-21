@@ -10,7 +10,7 @@ Thanks for contributing.
 ## Local Setup
 
 ```bash
-git clone https://github.com/blancochuy/git-why.git
+git clone https://github.com/Blancochuy/git-why.git
 cd git-why
 go mod download
 go test ./...
@@ -19,22 +19,19 @@ go build -o git-why .
 
 ## Development Workflow
 
-1. Create a branch from `main`.
+1. Create a branch from the default branch. That branch is `feature/ai-integration` until it is renamed to `main`.
 2. Add or update tests for your change.
 3. Run local checks.
 4. Open a pull request.
 
 ## Quality Checks
 
+CI runs these on Ubuntu:
+
 ```bash
-# tests
-go test ./...
-
-# coverage
-go test ./... -cover
-
-# lint (if installed)
-golangci-lint run
+go test -race ./...
+go vet ./...
+go build -o git-why .
 ```
 
 ## Commit Convention
