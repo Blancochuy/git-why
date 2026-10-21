@@ -5,33 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.1.0] - 2026-03-02
+No version has been tagged yet. The section below is the planned first release.
+Tagging `v0.1.0` publishes the GitHub release.
+
+## [Unreleased]
 
 ### Added
-- Initial release of git-why
-- **RF-01**: Single line blame with full commit context
-- **RF-02**: Range of lines history
-- **RF-03**: Function/block detection (`--fn`) for Go, TS/JS, Python, Java, Rust
-- **RF-04**: Compact one-line output (`--short`)
-- **RF-05**: Search in commit history (`--search`) with regex support
-- **RF-08**: Watch mode for editor integration
-- **RF-09**: Multiple output formats (JSON, Markdown, plain)
-- **RF-10**: File statistics with author breakdown and activity heatmap
-- GitHub Actions CI/CD pipeline
-- goreleaser configuration for multi-platform releases
-- Shell completions (bash, zsh, fish, powershell)
+- Initial git-why CLI
+- Single line blame with commit message and body
+- Range history for `<file>:<start>-<end>`
+- Function history (`--fn`) for Go, TypeScript/JavaScript, Python, Java, and Rust
+- Compact output (`--short`)
+- Commit message search: `git-why search <file> --term <text>` (text or regex)
+- Watch mode for editor integration
+- JSON, Markdown, plain, and LLM-oriented output
+- File statistics with author breakdown and monthly activity
+- MCP server (`git-why mcp`) with `git-why-context` and `git-why-stats`
+- Optional GitHub pull request enrichment when `origin` is a GitHub remote
+- GitHub Actions CI on `main` and `feature/ai-integration`
+- GoReleaser configuration for release archives
+- Shell completions via `git-why completion` (bash, zsh, fish, powershell)
 
-### Features
-- `git-why <file>:<line>` - Show why a line exists
-- `git-why <file>:<start>-<end>` - Show history for a range
-- `git-why <file> --fn <function>` - Show function history
-- `git-why search <file> --term <text>` - Search commit history
-- `git-why stats <file>` - Show file statistics
-- `git-why watch <file>` - Interactive mode for editors
-
-### Technical
-- Go 1.22+ support
-- Cross-platform: macOS, Linux, Windows
-- Zero external runtime dependencies
-- < 500ms response time for typical queries
-- Local caching for API responses
+### Notes
+- Requires Git on `PATH`
+- Go 1.23 or newer
+- Release archives target linux, darwin, and windows (amd64 and arm64) once `v0.1.0` is tagged
+- GitHub and GitLab API responses are cached under `~/.cache/git-why` (override with `GITWHY_CACHE_DIR`)
+- The GitLab client is implemented but not called by the CLI yet

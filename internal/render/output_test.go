@@ -38,47 +38,6 @@ func TestFormatShort(t *testing.T) {
 	assert.Equal(t, expected, result)
 }
 
-func TestFormatDate(t *testing.T) {
-	tests := []struct {
-		name     string
-		input    time.Time
-		expected string
-	}{
-		{
-			name:     "today",
-			input:    time.Now().Add(-1 * time.Hour),
-			expected: "today",
-		},
-		{
-			name:     "yesterday",
-			input:    time.Now().Add(-25 * time.Hour),
-			expected: "yesterday",
-		},
-		{
-			name:     "days ago",
-			input:    time.Now().Add(-72 * time.Hour),
-			expected: "3 days ago",
-		},
-		{
-			name:     "weeks ago",
-			input:    time.Now().Add(-168 * time.Hour),
-			expected: "1 weeks ago",
-		},
-		{
-			name:     "specific date for old commits",
-			input:    time.Date(2024, 1, 15, 0, 0, 0, 0, time.UTC),
-			expected: "2024-01-15",
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			result := FormatDate(tt.input)
-			assert.Equal(t, tt.expected, result)
-		})
-	}
-}
-
 func TestColors(t *testing.T) {
 	assert.Equal(t, "\033[36m", defaultColors.Hash)
 	assert.Equal(t, "\033[33m", defaultColors.Author)

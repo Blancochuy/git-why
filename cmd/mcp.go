@@ -14,6 +14,7 @@ var mcpCmd = &cobra.Command{
 to use git-why as a native tool. The server communicates over standard I/O.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		server := mcp.NewServer(os.Stdin, os.Stdout)
+		server.SetVersion(version)
 		if err := server.Run(); err != nil {
 			os.Exit(1)
 		}

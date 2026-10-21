@@ -17,7 +17,8 @@ var (
 var searchCmd = &cobra.Command{
 	Use:   "search <file> --term <text>",
 	Short: "Search commit history for a file by text or regex",
-	Long: `Filter and show commits where the message or diff contains the search term.
+	Long: `Filter commits whose subject or body contains the search term.
+The diff itself is not searched.
 
 Examples:
   git-why search src/auth.ts --term "security"
@@ -29,7 +30,9 @@ Examples:
 func init() {
 	searchCmd.Flags().StringVarP(&searchTerm, "term", "t", "", "search term (required)")
 	searchCmd.Flags().BoolVarP(&useRegex, "regex", "r", false, "treat term as regex")
-	searchCmd.MarkFlagRequired("term")
+	if err := searchCmd.MarkFlagRequired("term"); err != nil {
+		panic(err)
+	}
 	rootCmd.AddCommand(searchCmd)
 }
 
@@ -98,4 +101,3 @@ func highlightTerm(text, term string) string {
 		return highlight + match + reset
 	})
 }
-

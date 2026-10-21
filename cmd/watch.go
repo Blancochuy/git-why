@@ -6,7 +6,6 @@ import (
 	"os"
 	"strconv"
 	"strings"
-	"time"
 
 	"github.com/blancochuy/git-why/internal/git"
 	"github.com/blancochuy/git-why/internal/render"
@@ -118,6 +117,9 @@ func showLineWatch(repo *git.Repo, file string, lineNum int) error {
 	if err != nil {
 		return err
 	}
+	if git.IsUncommitted(blame.Hash) {
+		return fmt.Errorf("%s:%d has uncommitted changes", file, lineNum)
+	}
 
 	commit, err := repo.ShowCommit(blame.Hash)
 	if err != nil {
@@ -139,26 +141,3 @@ func showLineWatch(repo *git.Repo, file string, lineNum int) error {
 	renderer.RenderLine(file, lineNum, blame, commit)
 	return nil
 }
-
-type WatchOutput struct {
-	File    string    `json:"file"`
-	Line    int       `json:"line"`
-	Hash    string    `json:"hash"`
-	Author  string    `json:"author"`
-	Date    time.Time `json:"date"`
-	Message string    `json:"message"`
-}
-
-func formatWatchOutput(file string, lineNum int, blame *git.BlameResult, commit *git.CommitInfo) string {
-	return fmt.Sprintf("Line %d: %s - %s - @%s - %s",
-		lineNum,
-		blame.Hash[:7],
-		commit.Date.Format("2006-01-02"),
-		blame.Author,
-		strings.Split(commit.Message, "\n")[0],
-	)
-}
-
-type gitBlameResult = git.BlameResult
-type gitCommitInfo = git.CommitInfo
-

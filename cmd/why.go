@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/blancochuy/git-why/internal/git"
+	"github.com/blancochuy/git-why/internal/render"
 	"github.com/spf13/cobra"
 )
 
@@ -20,16 +21,18 @@ var whyCmd = &cobra.Command{
 	Long: `Show who wrote a line, when, and most importantly - why.
 
 Examples:
-  git-why src/auth.ts:142              # Single line
-  git-why src/auth.ts:140-155          # Range of lines
+  git-why src/auth.ts:142                    # Single line
+  git-why src/auth.ts:140-155                # Range of lines
   git-why src/auth.ts --fn authenticateUser  # Function history
-  git-why src/auth.ts:142 --short      # Compact output
-  git-why src/auth.ts:142 --context 5  # More context`,
+  git-why src/auth.ts:142 --short            # Compact output`,
 	Args: cobra.ExactArgs(1),
 	RunE: runWhy,
 }
 
 func init() {
+	// Registered on the root command as well so `git-why <file> --fn <name>`
+	// works. The why subcommand keeps its own flag for `git-why why ... --fn`.
+	rootCmd.Flags().StringVarP(&funcName, "fn", "f", "", "function name to analyze")
 	whyCmd.Flags().StringVarP(&funcName, "fn", "f", "", "function name to analyze")
 	rootCmd.AddCommand(whyCmd)
 }
@@ -63,7 +66,9 @@ func showFunction(repo *git.Repo, file, funcName string) error {
 		return err
 	}
 
-	fmt.Printf("Function %s() in %s (lines %d-%d):\n\n", funcName, file, bounds.StartLine, bounds.EndLine)
+	if !jsonOutput && !mdOutput && !llmOutput {
+		fmt.Printf("Function %s() in %s (lines %d-%d):\n\n", funcName, file, bounds.StartLine, bounds.EndLine)
+	}
 	return showRange(repo, file, bounds.StartLine, bounds.EndLine)
 }
 
@@ -75,6 +80,9 @@ func parseTarget(target string) (file string, line, endLine int, err error) {
 		file = matches[1]
 		line, _ = strconv.Atoi(matches[2])
 		endLine, _ = strconv.Atoi(matches[3])
+		if line < 1 || endLine < line {
+			err = fmt.Errorf("invalid range %d-%d", line, endLine)
+		}
 		return
 	}
 
@@ -93,6 +101,9 @@ func showLine(repo *git.Repo, file string, line int) error {
 	if err != nil {
 		return err
 	}
+	if git.IsUncommitted(blame.Hash) {
+		return fmt.Errorf("%s:%d has uncommitted changes", file, line)
+	}
 
 	commit, err := repo.ShowCommit(blame.Hash)
 	if err != nil {
@@ -100,12 +111,7 @@ func showLine(repo *git.Repo, file string, line int) error {
 	}
 
 	if shortOutput {
-		fmt.Printf("%s - %s - @%s - %s\n",
-			blame.Hash[:7],
-			commit.Date.Format("2006-01-02"),
-			blame.Author,
-			strings.Split(commit.Message, "\n")[0],
-		)
+		fmt.Println(render.FormatShort(blame, commit))
 		return nil
 	}
 
@@ -138,6 +144,16 @@ func showRange(repo *git.Repo, file string, start, end int) error {
 		return err
 	}
 
+	if jsonOutput {
+		return outputJSONRange(file, start, end, commits)
+	}
+	if mdOutput {
+		return outputMarkdownRange(file, start, end, commits)
+	}
+	if llmOutput {
+		return outputLLMRange(file, start, end, commits)
+	}
+
 	fmt.Printf("Commits that modified %s:%d-%d:\n\n", file, start, end)
 	for _, c := range commits {
 		if shortOutput {
@@ -158,4 +174,3 @@ func showRange(repo *git.Repo, file string, start, end int) error {
 	}
 	return nil
 }
-

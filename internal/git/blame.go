@@ -94,13 +94,18 @@ func parseBlameOutput(output string) (*BlameResult, error) {
 	result := &BlameResult{}
 	scanner := bufio.NewScanner(strings.NewReader(output))
 
-	hashPattern := regexp.MustCompile(`^([a-f0-9]+)\s`)
-
 	for scanner.Scan() {
 		line := scanner.Text()
 
-		if matches := hashPattern.FindStringSubmatch(line); matches != nil && result.Hash == "" {
-			result.Hash = matches[1]
+		if result.Hash == "" {
+			var hash string
+			var orig, final, count int
+			if _, err := fmt.Sscanf(line, "%s %d %d %d", &hash, &orig, &final, &count); err == nil && isHexHash(hash) {
+				result.Hash = hash
+				result.OriginalLineNum = orig
+				result.FinalLineNum = final
+				continue
+			}
 		}
 
 		if strings.HasPrefix(line, "author ") {
@@ -204,6 +209,30 @@ func parseLogOutput(output string) ([]CommitInfo, error) {
 	return commits, nil
 }
 
+func IsUncommitted(hash string) bool {
+	if hash == "" {
+		return false
+	}
+	for _, c := range hash {
+		if c != '0' {
+			return false
+		}
+	}
+	return true
+}
+
+func isHexHash(s string) bool {
+	if len(s) < 7 || len(s) > 40 {
+		return false
+	}
+	for _, c := range s {
+		if (c < '0' || c > '9') && (c < 'a' || c > 'f') {
+			return false
+		}
+	}
+	return true
+}
+
 func parseTimestamp(s string) (time.Time, error) {
 	var ts int64
 	if _, err := fmt.Sscanf(s, "%d", &ts); err != nil {
@@ -213,7 +242,9 @@ func parseTimestamp(s string) (time.Time, error) {
 }
 
 func (r *Repo) SearchHistory(file, term string, isRegex bool) ([]CommitInfo, error) {
-	output, err := r.runGit("log", "--no-patch", "--format=%H|%an|%at|%s%n%b", "--", file)
+	// Unit separator between fields, record separator between commits, so
+	// blank lines inside a commit body do not split the record.
+	output, err := r.runGit("log", "--no-patch", "--format=%H%x1f%an%x1f%at%x1f%s%x1f%b%x1e", "--", file)
 	if err != nil {
 		return nil, err
 	}
@@ -223,19 +254,15 @@ func (r *Repo) SearchHistory(file, term string, isRegex bool) ([]CommitInfo, err
 
 func filterCommitsByTerm(output, term string, isRegex bool) ([]CommitInfo, error) {
 	var commits []CommitInfo
-	blocks := strings.Split(output, "\n\n")
+	records := strings.Split(output, "\x1e")
 
-	for _, block := range blocks {
-		if strings.TrimSpace(block) == "" {
+	for _, record := range records {
+		record = strings.Trim(record, "\r\n")
+		if strings.TrimSpace(record) == "" {
 			continue
 		}
 
-		lines := strings.Split(block, "\n")
-		if len(lines) < 1 {
-			continue
-		}
-
-		parts := strings.SplitN(lines[0], "|", 4)
+		parts := strings.SplitN(record, "\x1f", 5)
 		if len(parts) < 4 {
 			continue
 		}
@@ -250,11 +277,15 @@ func filterCommitsByTerm(output, term string, isRegex bool) ([]CommitInfo, error
 			commit.Date = t
 		}
 
-		if len(lines) > 1 {
-			commit.Body = strings.Join(lines[1:], "\n")
+		if len(parts) == 5 {
+			commit.Body = strings.Trim(parts[4], "\r\n")
 		}
 
-		if matchesTerm(commit, term, isRegex) {
+		matched, err := matchesTerm(commit, term, isRegex)
+		if err != nil {
+			return nil, err
+		}
+		if matched {
 			commits = append(commits, commit)
 		}
 	}
@@ -262,13 +293,16 @@ func filterCommitsByTerm(output, term string, isRegex bool) ([]CommitInfo, error
 	return commits, nil
 }
 
-func matchesTerm(commit CommitInfo, term string, isRegex bool) bool {
+func matchesTerm(commit CommitInfo, term string, isRegex bool) (bool, error) {
 	text := commit.Message + " " + commit.Body
 
 	if isRegex {
-		matched, _ := regexp.MatchString(term, text)
-		return matched
+		re, err := regexp.Compile(term)
+		if err != nil {
+			return false, fmt.Errorf("invalid search regex: %w", err)
+		}
+		return re.MatchString(text), nil
 	}
 
-	return strings.Contains(strings.ToLower(text), strings.ToLower(term))
+	return strings.Contains(strings.ToLower(text), strings.ToLower(term)), nil
 }

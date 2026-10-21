@@ -62,6 +62,9 @@ func outputJSON(file string, line int, blame *git.BlameResult, commit *git.Commi
 }
 
 func outputJSONRange(file string, start, end int, commits []git.CommitInfo) error {
+	if commits == nil {
+		commits = []git.CommitInfo{}
+	}
 	entries := make([]CommitEntry, len(commits))
 	for i, c := range commits {
 		entries[i] = CommitEntry{
@@ -103,6 +106,24 @@ func outputMarkdown(file string, line int, blame *git.BlameResult, commit *git.C
 		fmt.Printf("## Context\n\n```\n%s\n```\n", strings.TrimSpace(commit.Body))
 	}
 
+	return nil
+}
+
+func outputLLMRange(file string, start, end int, commits []git.CommitInfo) error {
+	fmt.Printf("FILE: %s:%d-%d\n", file, start, end)
+	fmt.Printf("COMMITS: %d\n", len(commits))
+	for _, c := range commits {
+		hash := c.Hash
+		if len(hash) > 12 {
+			hash = hash[:12]
+		}
+		fmt.Printf("- %s | %s | @%s | %s\n",
+			hash,
+			c.Date.Format("2006-01-02"),
+			c.Author,
+			strings.Split(c.Message, "\n")[0],
+		)
+	}
 	return nil
 }
 

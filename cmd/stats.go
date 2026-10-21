@@ -141,10 +141,15 @@ func printMonthlyActivity(stats *git.FileStats) {
 
 	for _, m := range stats.LinesByMonth {
 		total := m.Additions + m.Deletions
-		barWidth := 0
-		if maxChanges > 0 {
-			barWidth = (total * 20) / maxChanges
+		if maxChanges == 0 {
+			fmt.Printf("  %s %s %5d changes\n",
+				m.Month.Format("Jan 2006"),
+				strings.Repeat(" ", 20),
+				total,
+			)
+			continue
 		}
+		barWidth := (total * 20) / maxChanges
 
 		addBar := strings.Repeat("+", statsMin(m.Additions*20/maxChanges, barWidth))
 		delBar := strings.Repeat("-", statsMin(m.Deletions*20/maxChanges, 20-barWidth))

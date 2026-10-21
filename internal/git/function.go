@@ -85,6 +85,7 @@ func findFunctionInContent(content, funcName string, parser LanguageParser) (*Fu
 	var baseIndent string
 	foundStart := false
 	braceCount := 0
+	lastContent := 0
 	bounds := &FunctionBounds{Name: funcName}
 
 	for scanner.Scan() {
@@ -98,6 +99,7 @@ func findFunctionInContent(content, funcName string, parser LanguageParser) (*Fu
 					name := matches[len(matches)-1]
 					if name == funcName {
 						bounds.StartLine = lineNum
+						lastContent = lineNum
 						foundStart = true
 						if len(matches) > 2 {
 							baseIndent = matches[1]
@@ -117,16 +119,27 @@ func findFunctionInContent(content, funcName string, parser LanguageParser) (*Fu
 				bounds.EndLine = lineNum
 				return bounds, nil
 			}
-		} else {
-			if baseIndent != "" && !strings.HasPrefix(line, baseIndent) && strings.TrimSpace(line) != "" {
-				bounds.EndLine = lineNum - 1
-				return bounds, nil
-			}
+			continue
 		}
+
+		// Indentation languages (Python): a non-empty line at the same or
+		// lesser indent ends the function. Top-level defs have empty indent.
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+		indent := line[:len(line)-len(strings.TrimLeft(line, " \t"))]
+		if len(indent) <= len(baseIndent) {
+			bounds.EndLine = lastContent
+			return bounds, nil
+		}
+		lastContent = lineNum
 	}
 
 	if foundStart {
 		bounds.EndLine = lineNum
+		if parser.EndPattern == nil && lastContent > 0 {
+			bounds.EndLine = lastContent
+		}
 		return bounds, nil
 	}
 
