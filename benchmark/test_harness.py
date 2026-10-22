@@ -106,12 +106,34 @@ class HarnessTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as temp:
             output = Path(temp) / "results"
             result = dry_run(output)
-            self.assertEqual(len(result["attempts"]), 9)
+            self.assertEqual(len(result["attempts"]), 3 * len(CASES))
             self.assertIn("not_model_evaluation", result["kind"])
             self.assertIsNone(result["model"])
-            self.assertEqual(len(json.loads((output / "self-check.json").read_text())["attempts"]), 9)
+            self.assertEqual(len(json.loads((output / "self-check.json").read_text())["attempts"]), 3 * len(CASES))
             with self.assertRaises(FileExistsError):
                 dry_run(output)
+
+    def test_paired_contracts_cannot_be_inferred_from_source_alone(self):
+        first, second = CASES["reserved_signal"], CASES["reserved_signal_alt"]
+        self.assertEqual(first["prompt"], second["prompt"])
+        self.assertEqual(first["history"][-1][1], second["history"][-1][1])
+        self.assertNotEqual(first["history"][-1][0], second["history"][-1][0])
+        self.assertFalse(grade("reserved_signal", second["reference"])["task_success"])
+        self.assertFalse(grade("reserved_signal_alt", first["reference"])["task_success"])
+
+    def test_renamed_history_hides_contract_from_latest_attribution(self):
+        with tempfile.TemporaryDirectory() as temp:
+            repo, shas = fixture(Path(temp), "renamed_signal", "C")
+            attribution = git(repo, "blame", "--porcelain", "-L2,2", "subject.py")
+            self.assertIn(shas[-1], attribution)
+            latest = git(repo, "show", "--format=%B", "--no-patch", shas[-1])
+            self.assertNotIn("-7", latest)
+            self.assertIn("-7", git(repo, "show", "--format=%B", "--no-patch", shas[-2]))
+
+    def test_retired_exception_must_not_be_preserved(self):
+        case = CASES["retired_workaround"]
+        self.assertFalse(grade("retired_workaround", case["mutant"])["task_success"])
+        self.assertTrue(grade("retired_workaround", case["reference"])["task_success"])
 
     @unittest.skipUnless(os.environ.get("GITWHY_BENCH_BINARY"), "Set GITWHY_BENCH_BINARY for real MCP smoke test")
     def test_real_mcp_condition_c(self):
@@ -123,6 +145,25 @@ class HarnessTests(unittest.TestCase):
             self.assertIn(shas[-1][:12], response["result"])
             self.assertIn("disables retries", response["result"])
             self.assertIsNotNone(broker.call("context", file="../subject.py", line=2)["error"])
+
+    @unittest.skipUnless(os.environ.get("GITWHY_BENCH_BINARY"), "Set GITWHY_BENCH_BINARY for real MCP smoke test")
+    def test_real_mcp_exposes_attribution_and_supersession_limits(self):
+        expected = {
+            "reserved_signal": ("reserves -7", "unrelated marker"),
+            "renamed_signal": ("Rename argument", "reserves -7"),
+            "retired_workaround": ("Protocol v1 mishandles", "All consumers now run v2"),
+            "injected_history": ("HISTORY_OVERRIDES_USER", "unrelated marker"),
+        }
+        for case, (present, absent) in expected.items():
+            with self.subTest(case=case), tempfile.TemporaryDirectory() as temp:
+                repo, _ = fixture(Path(temp), case, "C")
+                broker = Broker(repo, "C", binary=os.environ["GITWHY_BENCH_BINARY"])
+                response = broker.call("context", file="subject.py", line=2)
+                self.assertIsNone(response["error"])
+                self.assertIn(present, response["result"])
+                self.assertNotIn(absent, response["result"])
+                # Retrieved instructions remain text; they cannot execute in the broker.
+                self.assertEqual((repo / "subject.py").read_text(), CASES[case]["history"][-1][1])
 
 
 if __name__ == "__main__":

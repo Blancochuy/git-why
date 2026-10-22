@@ -43,7 +43,21 @@ python benchmark/openrouter_runner.py run --phase smoke --execute --output tmp/o
 
 Defaults: 30 generation requests per run, 8 model turns and 20 tool calls per attempt, 2,048 output tokens per turn, 180 seconds per attempt, and at least 6 seconds between request starts. The parent process enforces the attempt deadline and preserves the request journal if a worker is terminated. Git/MCP subprocesses also have their own timeouts. A response-size limit is enforced before JSON parsing.
 
-The request cap counts API requests, including retries, not tasks. One attempt can use several requests. A 27-attempt pilot may require several days of free quota, depending on account limits and tool use. Increasing `--max-requests` does not increase OpenRouter's quota. There is no automatic resume or quota workaround. A new output directory is required for every run.
+The request cap counts API requests, including retries, not tasks. One attempt can use several requests. Even a small pilot may require several days of free quota, depending on account limits and tool use. Increasing `--max-requests` does not increase OpenRouter's quota. New runs require new output directories; explicit resume is supported only for unchanged controller-v2 runs.
+
+### Balanced block admission and resume
+
+The runner admits a complete A/B/C block only when all request budgets can cover `3 * (max_turns + max_retries)` HTTP requests. Defaults require 30 available requests for a new block. This is conservative: unused reservations are not charged or inserted into the pacing ledger. Actual requests alone consume the allowance.
+
+Every attempt retains the same turn limit. The fixed HTTP allowance of `max_turns + max_retries` is shared across all turns, so retries cannot multiply the entire attempt budget. A full pilot with a large total request cap can pause between blocks when daily quota is low.
+
+```bash
+python benchmark/openrouter_runner.py run --phase exploratory --case unknown --max-requests 100 --execute --output tmp/openrouter-block-001
+# Later, with enough quota and unchanged code, binary, and settings:
+python benchmark/openrouter_runner.py run --phase exploratory --max-requests 100 --execute --resume --output tmp/openrouter-block-001
+```
+
+Resume preserves the original plan and verifies its code/binary hashes, model selection, phase, sampling limits, retry policy, and total request cap. It skips all previously recorded attempts, including failures. An orphan attempt directory stops resume for manual audit rather than being overwritten. Legacy controller-v1 runs cannot be resumed. Model serving changes remain a reproducibility limitation even when local hashes are unchanged.
 
 ### Rate-limit policy
 
@@ -57,7 +71,7 @@ The request cap counts API requests, including retries, not tasks. One attempt c
 
 Use `--max-retries 0` to disable 429 retries. Use the same retry policy and interval across conditions and models. The six-second floor cannot be reduced through the CLI. Do not delete the ledger to evade the free quota.
 
-The entire batch stops on exhausted quota, unrecovered infrastructure errors, mismatched models, or nonzero reported cost. Failed and unstarted work stay in the manifest. Correct the issue and report a new run separately; never silently omit failures or replace them with favorable reruns.
+The entire batch stops on exhausted quota, insufficient block budget, unrecovered infrastructure errors, mismatched models, or nonzero reported cost. Failed and unstarted work stay in the manifest. Resume may continue unstarted work, but it never replaces failed attempts. If changing code or settings, create a separately labeled new run; never silently omit failures or replace them with favorable reruns.
 
 ## Pilot and multiple models
 
@@ -67,7 +81,7 @@ After inspecting smoke transcripts and freezing the configuration:
 python benchmark/openrouter_runner.py run --phase pilot --execute --max-requests 200 --output tmp/openrouter-pilot-001
 ```
 
-A pilot schedules 27 attempts per model. To compare several explicit models, repeat `--model`:
+A pilot schedules three repetitions per case and condition: 72 attempts per model for the eight-case v2 suite. Use explicit subsets for smaller predeclared blocks. To compare several explicit models, repeat `--model`:
 
 ```bash
 python benchmark/openrouter_runner.py run --model vendor/model-one:free --model vendor/model-two:free --phase smoke
@@ -75,12 +89,20 @@ python benchmark/openrouter_runner.py run --model vendor/model-one:free --model 
 
 Those two IDs are placeholders; substitute current catalog entries. Each model has separate results and independent sessions. All selected models share the run's request cap. Prefer one model per run initially to simplify quota management and failure diagnosis.
 
+### Exploratory case blocks
+
+```bash
+python benchmark/openrouter_runner.py run --phase exploratory --case reserved_signal --case unknown --repetitions 1
+```
+
+This previews six attempts, one per condition for each selected case, without API calls. Add `--execute` and a fresh `--output` directory to run it. Use the same settings across A/B/C. Record the selection before examining outcomes; do not present a post-hoc subset as the full suite. Exploratory runs are separate from the frozen pilot.
+
 ## What gets recorded
 
 - A frozen plan, sampling settings, tool schemas, system prompt, selected catalog records, binary hash, runner hashes, and source snapshot SHA.
 - Request payloads without authorization headers, raw returned JSON, model/provider identifiers when supplied, and provider-reported usage per response.
 - Tool calls and errors, final source, patch, final answer, termination category, and post-session behavioral grades.
-- `summary.json` with every planned attempt; unavailable usage stays null.
+- `summary.json` with every planned attempt; unavailable usage stays null. Patch behavior and task completion are separate fields, so a correct patch without a final answer remains visibly incomplete.
 - `review.json` with shuffled answers and rubrics, plus a separate `review-map.json`. Review packets omit explicit model and condition labels, but answer content can still reveal the condition.
 
 Runtime data is saved under the ignored `tmp/` directory by default. It remains local until deliberately reviewed and published. Keys are redacted before saving; response bodies from HTTP errors are not logged. No private rubric, reference implementation, or expected SHA is sent to the model. The API key is used by the HTTP controller only and stripped from the MCP subprocess environment.

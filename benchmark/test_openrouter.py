@@ -81,11 +81,18 @@ class OpenRouterTests(unittest.TestCase):
     def test_plan_balanced_seeded_and_fresh_ids(self):
         plan = make_plan(["test/model:free"], "pilot", 42)
         self.assertEqual(plan, make_plan(["test/model:free"], "pilot", 42))
-        self.assertEqual(len(plan), 27)
-        self.assertEqual(len({p["id"] for p in plan}), 27)
+        self.assertEqual(len(plan), 9 * len(CASES))
+        self.assertEqual(len({p["id"] for p in plan}), 9 * len(CASES))
         for case in CASES:
             for condition in "ABC":
                 self.assertEqual(sum(p["case"] == case and p["condition"] == condition for p in plan), 3)
+
+    def test_exploratory_subset_keeps_balanced_conditions(self):
+        plan = make_plan(["test/model:free"], "exploratory", 43, ["reserved_signal", "unknown"], 1)
+        self.assertEqual(len(plan), 6)
+        self.assertEqual({p["case"] for p in plan}, {"reserved_signal", "unknown"})
+        for case in ("reserved_signal", "unknown"):
+            self.assertEqual({p["condition"] for p in plan if p["case"] == case}, set("ABC"))
 
     def test_dotenv_is_literal_and_does_not_override_environment(self):
         with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"OPENROUTER_API_KEY": "already-set"}, clear=True):
@@ -221,15 +228,49 @@ class OpenRouterTests(unittest.TestCase):
             output = directory / "results"
             args = SimpleNamespace(binary=str(binary), max_turns=2, max_tokens=100,
                 seconds=1, interval=0, phase="smoke", seed=42, execute=True,
-                max_requests=1, max_retries=0, output=output)
+                max_requests=6, max_retries=0, output=output)
             with patch("openrouter_runner.API", CatalogAPI), patch("openrouter_runner.multiprocessing.get_context", return_value=SimpleNamespace(Process=Worker)):
                 execute(args, ["test/model:free"])
             manifest = json.loads((output / "manifest.json").read_text())
-            self.assertEqual(manifest["status"], "request_cap_reached")
-            self.assertEqual(manifest["requests_used"], 1)
+            self.assertEqual(manifest["status"], "finished_requires_human_review")
+            self.assertEqual(manifest["requests_used"], 3)
             attempt = json.loads((output / "attempt-001" / "attempt.json").read_text())
             self.assertEqual(attempt["termination"], "deadline_or_worker_failure")
             self.assertFalse(attempt["grade"]["task_success"])
+
+    def test_no_attempt_starts_without_full_comparison_budget(self):
+        class Catalog:
+            def __init__(self, key):
+                pass
+            def request(self, endpoint, **kwargs):
+                if endpoint == "key":
+                    return {"data": {"free_model_daily_requests": {"remaining": 50, "limit": 50}}}
+                return {"data": [{"id": "test/model:free", "pricing": {"prompt": "0", "completion": "0"},
+                                  "supported_parameters": ["tools", "max_tokens", "temperature"]}]}
+        with tempfile.TemporaryDirectory() as temp, patch.dict(os.environ, {"OPENROUTER_API_KEY": "admission-test-key"}):
+            directory = Path(temp)
+            binary = directory / "binary"
+            binary.write_bytes(b"fake")
+            args = SimpleNamespace(binary=str(binary), max_turns=8, max_tokens=100,
+                seconds=1, interval=6, phase="smoke", seed=42, execute=True,
+                max_requests=29, max_retries=2, output=directory / "results")
+            with patch("openrouter_runner.API", Catalog), patch("openrouter_runner.multiprocessing.get_context") as context:
+                execute(args, ["test/model:free"])
+                context.return_value.Process.assert_not_called()
+            manifest = json.loads((args.output / "manifest.json").read_text())
+            self.assertEqual(manifest["status"], "insufficient_block_budget")
+            self.assertEqual(manifest["requests_used"], 0)
+            self.assertEqual(len(manifest["results"]), 0)
+            # Safe resume keeps the plan, and still refuses to shrink budgets.
+            args.resume = True
+            with patch("openrouter_runner.API", Catalog):
+                execute(args, ["test/model:free"])
+            resumed = json.loads((args.output / "manifest.json").read_text())
+            self.assertEqual(manifest["plan"], resumed["plan"])
+            self.assertEqual(len(resumed["invocations"]), 2)
+            binary.write_bytes(b"changed")
+            with self.assertRaisesRegex(RunError, "changed"):
+                execute(args, ["test/model:free"])
 
 
 if __name__ == "__main__":

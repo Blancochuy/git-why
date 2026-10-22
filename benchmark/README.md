@@ -4,6 +4,10 @@ Status: offline fixtures, restricted tool broker, reference-driver self-check, a
 
 See [OpenRouter setup and execution](OPENROUTER.md) for local `.env` configuration, model discovery, explicit execution, request caps, transcripts, and review packets.
 
+The suite now includes eight exploratory cases. See [design v2](DESIGN_V2.md) for the expanded inventory, the matched-contract pair, and the next predeclared live batch. The original three-case/27-attempt proposal below describes v1 planning; v2 has 72 attempts per model when all eight cases are repeated three times. No full pilot has been completed.
+
+The [second exploratory batch](reports/openrouter-exploratory-002.md) exercised a history-dependent contract and exposed a controller budget defect. Corrected controller-v2 runs admit balanced blocks, preserve turn budgets, and support explicit frozen-run resume. The old partial batch is retained rather than rerun under the same label.
+
 ## Run the harness checks
 
 Requires Python 3.10+ and Git. No third-party Python packages or API keys are needed.
@@ -13,7 +17,7 @@ python -m unittest discover -s benchmark -p 'test_*.py' -v
 python benchmark/harness.py --self-check tmp/benchmark-check-001
 ```
 
-Each self-check requires a new output directory and writes `self-check.json`. It records nine fixture/condition combinations using a reference driver that already knows the solutions. These are wiring checks, not model attempts, and cannot measure effectiveness.
+Each self-check requires a new output directory and writes `self-check.json`. It records all fixture/condition combinations (24 for the eight-case v2 suite) using a reference driver that already knows the solutions. These are wiring checks, not model attempts, and cannot measure effectiveness.
 
 Set `GITWHY_BENCH_BINARY` to the absolute path of a local git-why binary to enable the real MCP integration test. Without it that test is explicitly skipped. CI builds the binary and runs all tests on Ubuntu and Windows.
 

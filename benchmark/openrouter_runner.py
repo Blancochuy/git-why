@@ -302,6 +302,7 @@ def run_attempt(spec, settings, directory, key, api=None, sleep=time.sleep):
                       elapsed_seconds=time.monotonic() - started, finished_at=utc_now())
         # Grading is after the remote session ends; it is never sent back to the model.
         record["grade"] = grade(spec["case"], final)
+        record["grade"]["behavior_pass"] = record["grade"].get("task_success")
         if record["termination"] != "completed":
             record["grade"]["task_success"] = False
         record["grade"]["overall_success"] = None
@@ -321,12 +322,14 @@ def child_attempt(spec, settings, directory, key):
         save(path, record, key)
 
 
-def make_plan(models, phase, seed):
+def make_plan(models, phase, seed, cases=None, repetitions=None):
     rng = random.Random(seed)
     plan = []
+    cases = cases or (["fallback"] if phase == "smoke" else list(CASES))
+    repetitions = repetitions or (3 if phase == "pilot" else 1)
     for model in models:
-        for case in (["fallback"] if phase == "smoke" else list(CASES)):
-            for repeat in range(1 if phase == "smoke" else 3):
+        for case in cases:
+            for repeat in range(repetitions):
                 conditions = list("ABC")
                 rng.shuffle(conditions)
                 for condition in conditions:
@@ -350,7 +353,11 @@ def summarize(directory):
             values = [u.get(field) if isinstance(u, dict) else None for u in usages]
             return sum(values) if values and all(isinstance(v, (int, float)) for v in values) else None
         rows.append({**spec, "termination": record.get("termination", "not_started"),
-                     "behavior_pass": record.get("grade", {}).get("task_success"),
+                     "behavior_pass": (all(record["grade"]["checks"]) if record.get("grade", {}).get("checks")
+                                       else record.get("grade", {}).get("behavior_pass")),
+                     "completed_task": record.get("grade", {}).get("task_success"),
+                     "configured_turn_limit": record.get("settings", {}).get("max_turns"),
+                     "source_unchanged": not bool(record.get("patch")) if "final_source" in record else None,
                      "overall_success": None,
                      "seconds": record.get("elapsed_seconds"),
                      "requests": len(record.get("requests", [])),
@@ -391,7 +398,27 @@ def execute(args, model_ids):
     settings = {"binary": str(binary.resolve()), "max_turns": args.max_turns,
                 "max_tokens": args.max_tokens, "max_tools": 20, "seconds": args.seconds,
                 "interval": args.interval}
-    plan = make_plan(model_ids, args.phase, args.seed)
+    plan = make_plan(model_ids, args.phase, args.seed, getattr(args, "cases", None), getattr(args, "repetitions", None))
+    frozen = None
+    code_hashes = {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                   for p in (Path(__file__), Path(__file__).with_name("harness.py"), Path(__file__).with_name("rate_limit.py"))}
+    binary_hash = hashlib.sha256(binary.read_bytes()).hexdigest()
+    if getattr(args, "resume", False):
+        frozen = json.loads((args.output / "manifest.json").read_text(encoding="utf-8"))
+        if frozen.get("protocol") != VERSION + "/openrouter-v2":
+            raise RunError("Legacy runs cannot be resumed; retain them as historical observations")
+        if frozen["code_sha256"] != code_hashes or frozen["binary_sha256"] != binary_hash:
+            raise RunError("Runner, fixture, or binary changed; resume would violate the frozen run")
+        if model_ids != [m["id"] for m in frozen["models"]]:
+            raise RunError("Resume model selection differs from the frozen plan")
+        if args.phase != frozen["phase"]:
+            raise RunError("Resume phase differs from the frozen plan")
+        for field in settings:
+            if settings[field] != frozen["settings"][field]:
+                raise RunError("Resume settings differ from the frozen run: " + field)
+        if args.max_retries != frozen["settings"]["max_retries"] or args.max_requests != frozen["request_cap"]:
+            raise RunError("Resume retry policy or total request cap differs from the frozen run")
+        plan = frozen["plan"]
     if not args.execute:
         print(json.dumps({"mode": "plan_only_no_api_calls", "attempts": len(plan),
                           "request_cap": args.max_requests, "plan": plan}, indent=2))
@@ -410,26 +437,38 @@ def execute(args, model_ids):
                     daily_limit=min(quota.get("limit", 50), 50), quota_remaining=quota["remaining"],
                     quota_snapshot_at=quota_snapshot_at, max_retries=args.max_retries,
                     max_retry_wait=30)
-    args.output.mkdir(parents=True, exist_ok=False)
-    manifest = {"protocol": VERSION + "/openrouter-v1", "phase": args.phase, "seed": args.seed,
+    if not frozen:
+        args.output.mkdir(parents=True, exist_ok=False)
+    manifest = frozen or {"protocol": VERSION + "/openrouter-v2", "phase": args.phase, "seed": args.seed,
                 "created_at": utc_now(), "plan": plan, "models": selected,
                 "system_prompt": SYSTEM, "settings": settings, "request_cap": args.max_requests,
-                "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
-                "code_sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
-                                for p in (Path(__file__), Path(__file__).with_name("harness.py"))},
+                "binary_sha256": binary_hash,
+                "code_sha256": code_hashes,
                 "status": "running", "results": [], "requests_used": 0, "initial_free_quota": quota,
                 "limitations": ["Model weights and serving providers can change on OpenRouter.",
                                 "Restricted Git broker is not an unrestricted coding agent.",
                                 "AST subset and tiny fixtures can produce ceiling effects.",
                                 "Behavioral grades require separate historical-accuracy review."]}
+    manifest["status"] = "running"
+    manifest.setdefault("invocations", []).append({"started_at": utc_now(), "free_quota": quota, "catalog": selected})
     save(args.output / "manifest.json", manifest, key)
     context = multiprocessing.get_context("spawn")
-    for spec in plan:
+    limiter = Limiter(settings["rate_state"], key, settings["interval"], settings["daily_limit"])
+    existing = {r["id"] for r in manifest["results"]}
+    for index, spec in enumerate(plan):
+        if spec["id"] in existing:
+            continue  # Never rerun a completed, failed, or interrupted attempt.
+        if (args.output / spec["id"]).exists():
+            raise RunError("Orphan attempt directory requires audit before resuming; no overwrite")
         remaining = args.max_requests - manifest["requests_used"]
-        if remaining <= 0:
-            manifest["status"] = "request_cap_reached"
-            break
-        local = dict(settings, max_turns=min(args.max_turns, remaining), max_http_requests=remaining)
+        if index % 3 == 0 or (index > 0 and plan[index - 1]["id"] in existing):
+            # Admit the whole A/B/C block at its full configured limits. Retry
+            # requests share a fixed per-attempt allowance across all turns.
+            block_budget = (3 - index % 3) * (args.max_turns + args.max_retries)
+            if min(remaining, limiter.available(quota["remaining"], quota_snapshot_at)) < block_budget:
+                manifest["status"] = "insufficient_block_budget"
+                break
+        local = dict(settings, max_http_requests=args.max_turns + args.max_retries)
         directory = args.output / spec["id"]
         directory.mkdir()
         process = context.Process(target=child_attempt, args=(spec, local, directory, key))
@@ -471,10 +510,13 @@ def main():
     report.add_argument("directory", type=Path)
     run = sub.add_parser("run")
     run.add_argument("--model", action="append", help="Exact :free ID; repeat for several models")
-    run.add_argument("--phase", choices=["smoke", "pilot"], default="smoke")
+    run.add_argument("--phase", choices=["smoke", "exploratory", "pilot"], default="smoke")
+    run.add_argument("--case", dest="cases", choices=list(CASES), action="append", help="Repeat to select a predeclared subset")
+    run.add_argument("--repetitions", type=int, help="Defaults to 1 for exploratory/smoke and 3 for pilot")
     run.add_argument("--output", type=Path, default=ROOT / "tmp" / "openrouter-smoke-001")
     run.add_argument("--binary")
     run.add_argument("--execute", action="store_true", help="Actually send inference requests")
+    run.add_argument("--resume", action="store_true", help="Continue only unstarted attempts in an unchanged frozen run")
     run.add_argument("--seed", type=int, default=42)
     run.add_argument("--max-requests", type=int, default=30)
     run.add_argument("--max-turns", type=int, default=8)
@@ -502,6 +544,10 @@ def main():
             raise RunError("Choose unique, explicit :free model IDs; routers and paid models are disabled")
         if min(args.max_requests, args.max_turns, args.max_tokens, args.seconds) < 1 or args.interval < 6 or not 0 <= args.max_retries <= 2:
             raise RunError("Invalid execution limits")
+        if args.repetitions is not None and args.repetitions < 1:
+            raise RunError("Repetitions must be positive")
+        if args.cases and len(set(args.cases)) != len(args.cases):
+            raise RunError("Duplicate case IDs are not permitted")
         execute(args, ids)
 
 

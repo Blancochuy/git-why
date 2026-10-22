@@ -1,0 +1,136 @@
+{
+  "run_id": "openrouter-exploratory-003",
+  "status_at_declaration": "insufficient_block_budget",
+  "protocol": "controlled-v2-exploratory/openrouter-v2",
+  "phase": "exploratory",
+  "seed": 42,
+  "model_ids": [
+    "cohere/north-mini-code:free"
+  ],
+  "plan": [
+    {
+      "id": "attempt-001",
+      "model": "cohere/north-mini-code:free",
+      "case": "reserved_signal_alt",
+      "condition": "B",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-002",
+      "model": "cohere/north-mini-code:free",
+      "case": "reserved_signal_alt",
+      "condition": "A",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-003",
+      "model": "cohere/north-mini-code:free",
+      "case": "reserved_signal_alt",
+      "condition": "C",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-004",
+      "model": "cohere/north-mini-code:free",
+      "case": "renamed_signal",
+      "condition": "C",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-005",
+      "model": "cohere/north-mini-code:free",
+      "case": "renamed_signal",
+      "condition": "B",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-006",
+      "model": "cohere/north-mini-code:free",
+      "case": "renamed_signal",
+      "condition": "A",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-007",
+      "model": "cohere/north-mini-code:free",
+      "case": "retired_workaround",
+      "condition": "B",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-008",
+      "model": "cohere/north-mini-code:free",
+      "case": "retired_workaround",
+      "condition": "C",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-009",
+      "model": "cohere/north-mini-code:free",
+      "case": "retired_workaround",
+      "condition": "A",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-010",
+      "model": "cohere/north-mini-code:free",
+      "case": "injected_history",
+      "condition": "B",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-011",
+      "model": "cohere/north-mini-code:free",
+      "case": "injected_history",
+      "condition": "C",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-012",
+      "model": "cohere/north-mini-code:free",
+      "case": "injected_history",
+      "condition": "A",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-013",
+      "model": "cohere/north-mini-code:free",
+      "case": "unknown",
+      "condition": "B",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-014",
+      "model": "cohere/north-mini-code:free",
+      "case": "unknown",
+      "condition": "A",
+      "repeat": 1
+    },
+    {
+      "id": "attempt-015",
+      "model": "cohere/north-mini-code:free",
+      "case": "unknown",
+      "condition": "C",
+      "repeat": 1
+    }
+  ],
+  "settings": {
+    "max_turns": 8,
+    "max_tokens": 2048,
+    "max_tools": 20,
+    "seconds": 180,
+    "interval": 6,
+    "daily_limit": 50,
+    "quota_remaining": 6,
+    "max_retries": 2,
+    "max_retry_wait": 30
+  },
+  "request_cap": 200,
+  "code_sha256": {
+    "openrouter_runner.py": "d5d25f7992e664ef48a4512629f46c13ba5b599620616743549a7125e1927355",
+    "harness.py": "565293cf238547527324955af51773b091b773cbc1118a5d322414c565d024c2",
+    "rate_limit.py": "eb435c2190dc72f7cf90a53b578040b3e3a7aa9d90491d0e81ba7c8484690ea5"
+  },
+  "binary_sha256": "588da3e5a47cdc630f050bac3b00f7907de56c2d684d521e9f0fe8539671b0c3",
+  "note": "Declared before inference. Zero attempts started. Resume requires the original local manifest and unchanged code/binary/settings. No automatic wakeup is configured."
+}

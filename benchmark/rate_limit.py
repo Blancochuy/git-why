@@ -64,3 +64,11 @@ class Limiter:
             row = db.execute("SELECT next_at FROM pacing WHERE identity=?", (self.identity,)).fetchone()
             next_at = max(row[0] if row else 0, self.clock() + seconds)
             db.execute("INSERT OR REPLACE INTO pacing VALUES (?, ?)", (self.identity, next_at))
+
+    def available(self, allowance, since):
+        with self.connect() as db:
+            count = db.execute("SELECT count(*) FROM requests WHERE identity=? AND timestamp>?",
+                               (self.identity, self.clock() - 86400)).fetchone()[0]
+            recent = db.execute("SELECT count(*) FROM requests WHERE identity=? AND timestamp>=?",
+                                (self.identity, since)).fetchone()[0]
+        return max(0, min(self.daily_limit - count, allowance - recent))
