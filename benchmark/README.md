@@ -1,6 +1,6 @@
 # Agent history benchmark
 
-Status: offline fixtures, restricted tool broker, reference-driver self-check, and an OpenRouter free-model runner are implemented. No model inference results have been produced. Authentication and real model tool use still require smoke validation.
+Status: offline fixtures, restricted tool broker, reference-driver self-check, and an OpenRouter free-model runner are implemented. The [initial integration smoke run](reports/openrouter-smoke-001.md) completed. It is not an effectiveness evaluation, and the pilot design is not frozen.
 
 See [OpenRouter setup and execution](OPENROUTER.md) for local `.env` configuration, model discovery, explicit execution, request caps, transcripts, and review packets.
 
@@ -124,10 +124,11 @@ Publish unfavorable results too. Changes to prompts, tools, cases, or grading af
 
 - [x] Build the three fixture histories and private reference checks.
 - [x] Test broker permissions and fixture separation in A, B, and C (adapter isolation still pending).
-- [x] Implement transcript capture, limits, clean resets, and scoring output (real inference smoke test pending).
+- [x] Implement transcript capture, limits, clean resets, and scoring output.
 - [x] Run harness checks with an omniscient reference driver; do not count them as model evaluation.
 - [x] Choose OpenRouter with explicit free-only routing; select exact eligible model IDs before inference.
-- [ ] Smoke-test one fresh attempt per condition, then freeze the pilot protocol.
+- [x] Smoke-test one fresh attempt per condition with a real model.
+- [ ] Address the observed ceiling effect and freeze the revised pilot protocol before evaluation.
 - [ ] Execute and review the 27-attempt controlled pilot.
 - [ ] Freeze real-case selection, then run a separately reported real-repository pilot.
 
