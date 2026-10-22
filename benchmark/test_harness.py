@@ -84,6 +84,17 @@ class HarnessTests(unittest.TestCase):
             self.assertIn("deadline", expired.call("history")["error"])
             self.assertEqual(len(broker.events), 2)
 
+    def test_git_patch_parity_and_revision_restrictions(self):
+        for condition in "BC":
+            with self.subTest(condition=condition), tempfile.TemporaryDirectory() as temp:
+                repo, shas = fixture(Path(temp), "fallback", condition)
+                broker = Broker(repo, condition)
+                patch = broker.call("show", sha=shas[-1])
+                self.assertIsNone(patch["error"])
+                self.assertIn("+    if seconds <= 0:", patch["result"])
+                self.assertIsNotNone(broker.call("show", sha="--all")["error"])
+                self.assertIsNotNone(broker.call("show", sha="f" * 40)["error"])
+
     def test_earlier_rationale_requires_more_than_latest_commit(self):
         with tempfile.TemporaryDirectory() as temp:
             repo, shas = fixture(Path(temp), "earlier", "B")

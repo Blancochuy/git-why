@@ -8,6 +8,7 @@ import operator
 import os
 from pathlib import Path
 import random
+import re
 import subprocess
 import tempfile
 import time
@@ -134,6 +135,10 @@ class Broker:
                 result = git(self.repo, "log", "--format=%H%n%B", "--", "subject.py")
             elif tool == "blame" and self.condition in "BC" and args == {}:
                 result = git(self.repo, "blame", "--porcelain", "--", "subject.py")
+            elif tool == "show" and self.condition in "BC" and set(args) == {"sha"} and isinstance(args["sha"], str) and re.fullmatch(r"[0-9a-f]{40}", args["sha"]):
+                if args["sha"] not in git(self.repo, "rev-list", "HEAD").splitlines():
+                    raise ValueError("Commit is not in the permitted history")
+                result = git(self.repo, "show", "--no-ext-diff", "--no-textconv", "--format=fuller", args["sha"], "--", "subject.py")
             elif tool == "context" and self.condition == "C" and self.binary and set(args) == {"file", "line"} and args["file"] == "subject.py" and type(args["line"]) is int and 1 <= args["line"] <= 1000:
                 requests = [
                     {"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {}},
@@ -259,7 +264,7 @@ def dry_run(destination, seed=42):
                                  "termination": "reference_driver_completed", "usage": None})
     result = {"protocol": VERSION, "kind": "harness_self_check_not_model_evaluation",
               "seed": seed, "model": None, "mcp_available": False,
-              "warning": "Reference driver knows the solutions. C MCP adapter is not implemented. No effectiveness conclusions are valid.",
+              "warning": "Reference driver knows the solutions and does not exercise MCP. No effectiveness conclusions are valid.",
               "harness_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
               "attempts": attempts}
     (destination / "self-check.json").write_text(json.dumps(result, indent=2) + "\n", encoding="utf-8")

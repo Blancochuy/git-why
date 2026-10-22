@@ -1,6 +1,8 @@
 # Agent history benchmark
 
-Status: offline fixtures, restricted tool broker, reference-driver self-check, and tests are implemented. No model runs or results have been produced. A provider adapter and complete attempt orchestration are still pending.
+Status: offline fixtures, restricted tool broker, reference-driver self-check, and an OpenRouter free-model runner are implemented. No model inference results have been produced. Authentication and real model tool use still require smoke validation.
+
+See [OpenRouter setup and execution](OPENROUTER.md) for local `.env` configuration, model discovery, explicit execution, request caps, transcripts, and review packets.
 
 ## Run the harness checks
 
@@ -17,14 +19,14 @@ Set `GITWHY_BENCH_BINARY` to the absolute path of a local git-why binary to enab
 
 ### Implemented boundaries and remaining work
 
-- The broker permits only `subject.py` reads/writes and fixed Git history/blame operations. C additionally supports a validated single-line MCP call when a binary is supplied.
+- The broker permits only `subject.py` reads/writes and fixed Git history/blame/show operations. Both B and C can inspect commit patches; show accepts only full SHAs reachable from the task snapshot. C additionally supports a validated single-line MCP call when a binary is supplied.
 - No shell, arbitrary Git arguments, URL tool, or Python execution tool is exposed. The current broker is intentionally narrower than a full coding agent's environment; report this limitation when comparing tools.
 - Private solutions and checks remain in the controller. A's visible workspace contains no Git metadata; its fixture-building history stays outside the exposed workspace. All conditions receive identical source bytes.
 - Patch checks use a small AST interpreter, with no `exec`, imports, decorators, attribute access, loops, or user-defined calls. Unsupported patches are classified explicitly. This limits the implementation styles accepted by the pilot; broader grading needs a separate sandbox design.
 - Explanation quality and historical accuracy require human review. Passing behavior checks alone is not overall success.
 - This is a tool capability boundary, not an OS sandbox. A future model adapter must receive only the prompt and broker tools, never controller filesystem or shell access. Do not run a local autonomous process against these fixtures without additional isolation.
 - MCP smoke tests use fresh processes and repositories without remotes. The self-check does not exercise MCP or a model. It records missing usage as null and labels itself as a harness check.
-- Complete model-run deadlines, response limits, termination handling, final-answer capture, patches, tool schemas, and provider usage integration must be implemented before any paid pilot. The broker currently enforces call budgets and checks elapsed time between calls, with subprocess timeouts; this is not yet a hard end-to-end attempt deadline.
+- The OpenRouter runner adds a parent-process deadline, response-size and request limits, final-answer/patch capture, condition-specific tool schemas, provider usage, and failure journals. Model adapters are remote tool-calling loops, with no local autonomous shell. Real inference must be smoke-tested before the pilot.
 
 ## Question
 
@@ -122,9 +124,9 @@ Publish unfavorable results too. Changes to prompts, tools, cases, or grading af
 
 - [x] Build the three fixture histories and private reference checks.
 - [x] Test broker permissions and fixture separation in A, B, and C (adapter isolation still pending).
-- [ ] Implement transcript capture, limits, clean resets, and scoring output.
+- [x] Implement transcript capture, limits, clean resets, and scoring output (real inference smoke test pending).
 - [x] Run harness checks with an omniscient reference driver; do not count them as model evaluation.
-- [ ] Choose a provider/model and API spending cap before paid execution.
+- [x] Choose OpenRouter with explicit free-only routing; select exact eligible model IDs before inference.
 - [ ] Smoke-test one fresh attempt per condition, then freeze the pilot protocol.
 - [ ] Execute and review the 27-attempt controlled pilot.
 - [ ] Freeze real-case selection, then run a separately reported real-repository pilot.
