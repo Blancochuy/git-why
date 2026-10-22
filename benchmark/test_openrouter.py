@@ -7,8 +7,8 @@ import unittest
 from unittest.mock import patch
 import urllib.error
 
-from openrouter_runner import (API, RunError, execute, free_tool_model, load_env, make_plan,
-                               payload_for, redact, run_attempt, save, select_models, summarize, tools_for)
+from openrouter_runner import (API, RateLimited, RunError, execute, free_tool_model, load_env, make_plan,
+                               payload_for, redact, retry_seconds, run_attempt, save, select_models, summarize, tools_for)
 from harness import CASES
 
 
@@ -131,6 +131,29 @@ class OpenRouterTests(unittest.TestCase):
         self.assertEqual(result["responses"], [])
         self.assertFalse(result["grade"]["task_success"])
 
+    def test_429_retries_are_bounded_logged_and_preserve_model(self):
+        settings = dict(self.settings(), max_retries=2, max_retry_wait=30, max_http_requests=3)
+        fake = FakeAPI([RateLimited(0), response()])
+        with tempfile.TemporaryDirectory() as temp:
+            result = run_attempt({"model": "test/model:free", "case": "fallback", "condition": "A"},
+                settings, Path(temp), "test-secret", api=fake, sleep=lambda seconds: None)
+        self.assertEqual(result["termination"], "completed")
+        self.assertEqual(len(result["requests"]), 2)
+        self.assertEqual(len(result["rate_limit_events"]), 1)
+        self.assertEqual(fake.payloads[0], fake.payloads[1])
+        with tempfile.TemporaryDirectory() as temp:
+            failed = run_attempt({"model": "test/model:free", "case": "fallback", "condition": "A"},
+                settings, Path(temp), "test-secret", api=FakeAPI([RateLimited(3600)]), sleep=lambda s: self.fail("Must not wait an hour"))
+        self.assertEqual(failed["termination"], "infrastructure_error")
+        self.assertEqual(len(failed["requests"]), 1)
+
+    def test_retry_after_seconds_and_dates(self):
+        self.assertEqual(retry_seconds("12"), 12)
+        self.assertIsNone(retry_seconds("invalid"))
+        self.assertIsNone(retry_seconds("nan"))
+        self.assertIsNone(retry_seconds("inf"))
+        self.assertEqual(retry_seconds("Wed, 01 Jan 2020 00:00:00 GMT"), 0)
+
     def test_truncated_answer_is_not_scored_as_success(self):
         result = self.run_fake(FakeAPI([response(finish="length")]))
         self.assertEqual(result["termination"], "incomplete_response")
@@ -175,6 +198,8 @@ class OpenRouterTests(unittest.TestCase):
             def __init__(self, key):
                 pass
             def request(self, *args, **kwargs):
+                if args[0] == "key":
+                    return {"data": {"free_model_daily_requests": {"remaining": 50, "limit": 50}}}
                 return {"data": [{"id": "test/model:free", "pricing": {"prompt": "0", "completion": "0"},
                                   "supported_parameters": ["tools", "max_tokens", "temperature"]}]}
         class Worker:
@@ -196,7 +221,7 @@ class OpenRouterTests(unittest.TestCase):
             output = directory / "results"
             args = SimpleNamespace(binary=str(binary), max_turns=2, max_tokens=100,
                 seconds=1, interval=0, phase="smoke", seed=42, execute=True,
-                max_requests=1, output=output)
+                max_requests=1, max_retries=0, output=output)
             with patch("openrouter_runner.API", CatalogAPI), patch("openrouter_runner.multiprocessing.get_context", return_value=SimpleNamespace(Process=Worker)):
                 execute(args, ["test/model:free"])
             manifest = json.loads((output / "manifest.json").read_text())

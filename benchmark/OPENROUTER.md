@@ -41,11 +41,23 @@ Without `--execute`, this prints the randomized plan and does not call the API. 
 python benchmark/openrouter_runner.py run --phase smoke --execute --output tmp/openrouter-smoke-001
 ```
 
-Defaults: 30 generation requests per run, 8 model turns and 20 tool calls per attempt, 2,048 output tokens per turn, 180 seconds per attempt, and a 4-second minimum pause between requests in normal execution. The parent process enforces the attempt deadline and preserves the request journal if a worker is terminated. Git/MCP subprocesses also have their own timeouts. A response-size limit is enforced before JSON parsing.
+Defaults: 30 generation requests per run, 8 model turns and 20 tool calls per attempt, 2,048 output tokens per turn, 180 seconds per attempt, and at least 6 seconds between request starts. The parent process enforces the attempt deadline and preserves the request journal if a worker is terminated. Git/MCP subprocesses also have their own timeouts. A response-size limit is enforced before JSON parsing.
 
-The request cap counts API requests, not tasks. One attempt can use several requests. A 27-attempt pilot may require several days of free quota, depending on account limits and tool use. Increasing `--max-requests` does not increase OpenRouter's quota. There are no automatic retries, resume, or quota workarounds. A new output directory is required for every run.
+The request cap counts API requests, including retries, not tasks. One attempt can use several requests. A 27-attempt pilot may require several days of free quota, depending on account limits and tool use. Increasing `--max-requests` does not increase OpenRouter's quota. There is no automatic resume or quota workaround. A new output directory is required for every run.
 
-The entire batch stops on infrastructure errors, mismatched models, or nonzero reported cost. Failed and unstarted work stay in the manifest. Correct the issue and report a new run separately; never silently omit failures or replace them with favorable reruns.
+### Rate-limit policy
+
+- Before inference, read the server-reported free quota. Stop if the API does not report usable remaining quota.
+- Reserve each request atomically in `tmp/openrouter-rate-limit.sqlite`. Processes and runs in this checkout share pacing and a conservative rolling 24-hour ceiling of at most 50 local requests per key, even if the account has a larger allowance. The ledger stores only a key hash, request timestamps, and pacing state.
+- Respect the remaining allowance observed at preflight. Usage by other applications or other checkouts can still cause a 429; local accounting cannot enforce a global account quota.
+- Retry only HTTP 429, at most twice, with exponential backoff plus jitter. Honor `Retry-After` in seconds or HTTP-date form. Record each rejection, scheduled delay, request, and pacing wait.
+- Wait at most 30 seconds for a retry and stay within the attempt deadline and request cap. A longer server hint stops the batch and leaves a shared cooldown for subsequent runs.
+- Do not retry ambiguous network failures, authentication errors, or other HTTP failures. Do not switch models or silently regenerate completed attempts.
+- Keep infrastructure delays and rate-limit events in reports. End-to-end elapsed time includes waiting, so it cannot alone establish a retrieval-efficiency improvement.
+
+Use `--max-retries 0` to disable 429 retries. Use the same retry policy and interval across conditions and models. The six-second floor cannot be reduced through the CLI. Do not delete the ledger to evade the free quota.
+
+The entire batch stops on exhausted quota, unrecovered infrastructure errors, mismatched models, or nonzero reported cost. Failed and unstarted work stay in the manifest. Correct the issue and report a new run separately; never silently omit failures or replace them with favorable reruns.
 
 ## Pilot and multiple models
 
@@ -87,7 +99,7 @@ Requests specify one exact `:free` catalog ID, disable provider fallbacks, requi
 
 The returned model may be a canonical ID without `:free`; that exact canonical equivalent is accepted and recorded. A different ID terminates the run. Provider and model weights are not pinned by a catalog ID. A provider can vary between requests even with fallbacks disabled unless explicitly pinned; report this uncertainty, retain the returned provider metadata, and avoid interpreting small latency differences as a tool effect.
 
-Free variants have availability and rate limits. The runner stops on 429 rather than falling back. The initial experiment sends only synthetic fixture code and retrieved synthetic history to OpenRouter; it gives the model no general network or filesystem tool.
+Free variants have availability and rate limits. The runner applies the bounded 429 policy above and never falls back to another model. The initial experiment sends only synthetic fixture code and retrieved synthetic history to OpenRouter; it gives the model no general network or filesystem tool.
 
 ## Verification
 
@@ -95,7 +107,7 @@ Free variants have availability and rate limits. The runner stops on 429 rather 
 python -m unittest discover -s benchmark -p 'test_*.py' -v
 ```
 
-The fake-response tests cover free-only routing, condition-specific tools, missing/paid models, secret redaction, tool execution, request failures, length truncation, model changes, cost anomalies, and turn limits. Real authentication and model inference remain unverified until a key is configured and a smoke run is executed.
+The fake-response tests cover free-only routing, condition-specific tools, missing/paid models, secret redaction, tool execution, request failures, length truncation, model changes, cost anomalies, turn limits, retry bounds, and failed-run summaries. The rate-limit tests cover shared pacing, atomic concurrent quota reservations, server allowances, deadlines, and absence of raw keys in the ledger. Run smoke checks separately from evaluation; inspect their transcripts before freezing a pilot configuration.
 
 ## Official references
 

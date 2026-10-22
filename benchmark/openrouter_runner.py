@@ -4,9 +4,11 @@ import argparse
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
 import difflib
+from email.utils import parsedate_to_datetime
 import hashlib
 import json
 import multiprocessing
+import math
 import os
 from pathlib import Path
 import random
@@ -17,6 +19,7 @@ import urllib.error
 import urllib.request
 
 from harness import Broker, CASES, VERSION, fixture, grade
+from rate_limit import Limiter, QuotaExhausted
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -35,6 +38,23 @@ There is no shell or network tool. Do not claim to have run tests.
 
 class RunError(Exception):
     pass
+
+
+class RateLimited(RunError):
+    def __init__(self, retry_after=None):
+        super().__init__("HTTP 429; free model rate limited")
+        self.retry_after = retry_after
+
+
+def retry_seconds(value):
+    try:
+        seconds = float(value)
+        return max(0, seconds) if math.isfinite(seconds) else None
+    except (TypeError, ValueError):
+        try:
+            return max(0, parsedate_to_datetime(value).timestamp() - time.time())
+        except (TypeError, ValueError, OverflowError):
+            return None
 
 
 def utc_now():
@@ -106,8 +126,9 @@ class API:
                 return result
         except urllib.error.HTTPError as error:
             # Do not print provider error bodies, request headers, or the key.
-            retry = error.headers.get("Retry-After", "unspecified")
-            raise RunError(f"HTTP {error.code}; Retry-After={retry}. No automatic retry.") from None
+            if error.code == 429:
+                raise RateLimited(retry_seconds(error.headers.get("Retry-After"))) from None
+            raise RunError(f"HTTP {error.code}; no automatic retry.") from None
         except (urllib.error.URLError, TimeoutError, OSError, ValueError) as error:
             raise RunError("Network, timeout, or JSON error (" + type(error).__name__ + ")") from None
 
@@ -170,8 +191,10 @@ def run_attempt(spec, settings, directory, key, api=None, sleep=time.sleep):
     """Remote model sees messages/tools only, not controller files or graders."""
     api = api or API(key)
     started = time.monotonic()
+    limiter = Limiter(settings["rate_state"], key, settings["interval"], settings["daily_limit"]) if settings.get("rate_state") else None
     record = {"spec": spec, "started_at": utc_now(), "responses": [], "requests": [],
-              "termination": "running", "usage": [], "model": spec["model"], "settings": settings}
+              "termination": "running", "usage": [], "model": spec["model"], "settings": settings,
+              "rate_limit_events": [], "pacing_wait_seconds": 0}
     # This journal survives request failures or termination by the parent watchdog.
     def checkpoint():
         save(directory / "attempt.json", record, key)
@@ -188,16 +211,39 @@ def run_attempt(spec, settings, directory, key, api=None, sleep=time.sleep):
         checkpoint()
         try:
             for turn in range(settings["max_turns"]):
-                if turn:
+                if turn and not limiter:
                     sleep(settings["interval"])
                 remaining = settings["seconds"] - (time.monotonic() - started)
                 if remaining <= 0:
                     record["termination"] = "deadline"
                     break
                 payload = payload_for(spec["model"], messages, spec["condition"], settings["max_tokens"])
-                record["requests"].append(payload)
-                checkpoint()  # Includes failed or ambiguous requests in request counts.
-                response = api.request("chat/completions", payload, timeout=min(60, remaining))
+                for retry in range(settings.get("max_retries", 0) + 1):
+                    if len(record["requests"]) >= settings.get("max_http_requests", settings["max_turns"]):
+                        raise QuotaExhausted("Attempt HTTP request budget exhausted")
+                    if limiter:
+                        record["pacing_wait_seconds"] += limiter.acquire(
+                            time.monotonic() + max(0, settings["seconds"] - (time.monotonic() - started)),
+                            settings.get("quota_remaining"), settings.get("quota_snapshot_at"))
+                    remaining = settings["seconds"] - (time.monotonic() - started)
+                    if remaining <= 0:
+                        raise QuotaExhausted("Attempt deadline exhausted")
+                    record["requests"].append(payload)
+                    checkpoint()  # Includes every failed/retried/ambiguous HTTP request.
+                    try:
+                        response = api.request("chat/completions", payload, timeout=min(60, remaining))
+                        break
+                    except RateLimited as error:
+                        delay = max(error.retry_after or 0, min(30, 6 * 2**retry) + random.uniform(0, 1))
+                        record["rate_limit_events"].append({"turn": turn + 1, "retry": retry,
+                            "retry_after": error.retry_after, "scheduled_delay_seconds": delay})
+                        checkpoint()
+                        if limiter:
+                            limiter.cooldown(delay)
+                        if retry >= settings.get("max_retries", 0) or delay > settings.get("max_retry_wait", 30):
+                            raise
+                        if not limiter:
+                            sleep(delay)
                 response = redact(response, key)
                 record["responses"].append(response)
                 record["usage"].append(response.get("usage"))
@@ -245,6 +291,8 @@ def run_attempt(spec, settings, directory, key, api=None, sleep=time.sleep):
                 checkpoint()
             else:
                 record["termination"] = "turn_budget"
+        except QuotaExhausted as error:
+            record.update(termination="quota_or_pacing_limit", error=str(error))
         except (RunError, KeyError, IndexError, TypeError, ValueError) as error:
             record.update(termination="infrastructure_error", error=str(error))
         final = (repo / "subject.py").read_text(encoding="utf-8")
@@ -297,6 +345,8 @@ def summarize(directory):
         record = json.loads(path.read_text(encoding="utf-8")) if path.exists() else {}
         usages = record.get("usage", [])
         def total(field):
+            if len(usages) != len(record.get("requests", [])):
+                return None  # Missing responses may have unknown provider usage.
             values = [u.get(field) if isinstance(u, dict) else None for u in usages]
             return sum(values) if values and all(isinstance(v, (int, float)) for v in values) else None
         rows.append({**spec, "termination": record.get("termination", "not_started"),
@@ -306,6 +356,8 @@ def summarize(directory):
                      "requests": len(record.get("requests", [])),
                      "tool_calls": len(record.get("events", [])),
                      "context_calls": sum(e.get("tool") == "context" for e in record.get("events", [])),
+                     "rate_limit_errors": len(record.get("rate_limit_events", [])),
+                     "pacing_wait_seconds": record.get("pacing_wait_seconds"),
                      "prompt_tokens": total("prompt_tokens"),
                      "completion_tokens": total("completion_tokens"), "reported_cost": total("cost")})
         if record.get("final_answer"):
@@ -348,8 +400,16 @@ def execute(args, model_ids):
     if not key:
         raise RunError("Set OPENROUTER_API_KEY in the local .env file")
     api = API(key)
+    quota = api.request("key")["data"].get("free_model_daily_requests") or {}
+    if not isinstance(quota.get("remaining"), int) or quota["remaining"] < 1:
+        raise RunError("No usable free request quota reported; stop before generation")
+    quota_snapshot_at = time.time()
     catalog = api.request("models", authenticated=False)
     selected = select_models(catalog, model_ids)
+    settings.update(rate_state=str((ROOT / "tmp" / "openrouter-rate-limit.sqlite").resolve()),
+                    daily_limit=min(quota.get("limit", 50), 50), quota_remaining=quota["remaining"],
+                    quota_snapshot_at=quota_snapshot_at, max_retries=args.max_retries,
+                    max_retry_wait=30)
     args.output.mkdir(parents=True, exist_ok=False)
     manifest = {"protocol": VERSION + "/openrouter-v1", "phase": args.phase, "seed": args.seed,
                 "created_at": utc_now(), "plan": plan, "models": selected,
@@ -357,7 +417,7 @@ def execute(args, model_ids):
                 "binary_sha256": hashlib.sha256(binary.read_bytes()).hexdigest(),
                 "code_sha256": {p.name: hashlib.sha256(p.read_bytes()).hexdigest()
                                 for p in (Path(__file__), Path(__file__).with_name("harness.py"))},
-                "status": "running", "results": [], "requests_used": 0,
+                "status": "running", "results": [], "requests_used": 0, "initial_free_quota": quota,
                 "limitations": ["Model weights and serving providers can change on OpenRouter.",
                                 "Restricted Git broker is not an unrestricted coding agent.",
                                 "AST subset and tiny fixtures can produce ceiling effects.",
@@ -369,7 +429,7 @@ def execute(args, model_ids):
         if remaining <= 0:
             manifest["status"] = "request_cap_reached"
             break
-        local = dict(settings, max_turns=min(args.max_turns, remaining))
+        local = dict(settings, max_turns=min(args.max_turns, remaining), max_http_requests=remaining)
         directory = args.output / spec["id"]
         directory.mkdir()
         process = context.Process(target=child_attempt, args=(spec, local, directory, key))
@@ -391,10 +451,9 @@ def execute(args, model_ids):
         manifest["results"].append({"id": spec["id"], "termination": record["termination"]})
         save(args.output / "manifest.json", manifest, key)
         print(f"{spec['id']}: {spec['model']} / {spec['condition']} / {record['termination']}", flush=True)
-        if record["termination"] in ("infrastructure_error", "controller_error", "model_mismatch", "nonzero_reported_cost"):
+        if record["termination"] in ("infrastructure_error", "controller_error", "model_mismatch", "nonzero_reported_cost", "quota_or_pacing_limit"):
             manifest["status"] = "stopped_on_error"
             break
-        time.sleep(args.interval)
     else:
         manifest["status"] = "finished_requires_human_review"
     manifest["finished_at"] = utc_now()
@@ -421,7 +480,8 @@ def main():
     run.add_argument("--max-turns", type=int, default=8)
     run.add_argument("--max-tokens", type=int, default=2048)
     run.add_argument("--seconds", type=int, default=180)
-    run.add_argument("--interval", type=float, default=4)
+    run.add_argument("--interval", type=float, default=6)
+    run.add_argument("--max-retries", type=int, default=2, help="Bounded 429-only retries, logged separately")
     args = parser.parse_args()
     load_env(args.env_file)
     if args.command == "models":
@@ -440,7 +500,7 @@ def main():
         ids = args.model or [m.strip() for m in os.environ.get("OPENROUTER_MODEL", "").split(",") if m.strip()]
         if not ids or len(set(ids)) != len(ids) or any(not m.endswith(":free") for m in ids):
             raise RunError("Choose unique, explicit :free model IDs; routers and paid models are disabled")
-        if min(args.max_requests, args.max_turns, args.max_tokens, args.seconds) < 1 or args.interval < 0:
+        if min(args.max_requests, args.max_turns, args.max_tokens, args.seconds) < 1 or args.interval < 6 or not 0 <= args.max_retries <= 2:
             raise RunError("Invalid execution limits")
         execute(args, ids)
 
