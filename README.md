@@ -14,11 +14,11 @@ Understand why code exists, not just who wrote it. `git-why` brings together lin
 
 ## Demo
 
-Trace a line, follow a function, and retrieve context for a coding agent in under 20 seconds.
+See git-why in action on Cobra: inspect a line, trace a function, and retrieve context for a coding agent.
 
-![Animated terminal demo showing line attribution, function history, and agent-oriented output from git-why](assets/git-why-demo.gif)
+[![Terminal walkthrough of git-why on Cobra, showing installation, line attribution, function history, and agent-oriented output](assets/git-why-terminal-demo.gif)](assets/git-why-terminal-demo.mp4)
 
-Rendered from real v0.1.0 CLI output with animated typing. The final scene shows an output excerpt. See the [text examples](#quick-start) or [reproduce the demo](assets/DEMO.md).
+[Watch the MP4](assets/git-why-terminal-demo.mp4) · About 54 seconds. See the [text examples](#quick-start) or [demo notes](assets/DEMO.md).
 
 ## Why git-why?
 
