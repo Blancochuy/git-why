@@ -1,6 +1,30 @@
 # Agent history benchmark
 
-Status: proposed protocol. No model runs or results have been produced.
+Status: offline fixtures, restricted tool broker, reference-driver self-check, and tests are implemented. No model runs or results have been produced. A provider adapter and complete attempt orchestration are still pending.
+
+## Run the harness checks
+
+Requires Python 3.10+ and Git. No third-party Python packages or API keys are needed.
+
+```bash
+python -m unittest discover -s benchmark -p 'test_*.py' -v
+python benchmark/harness.py --self-check tmp/benchmark-check-001
+```
+
+Each self-check requires a new output directory and writes `self-check.json`. It records nine fixture/condition combinations using a reference driver that already knows the solutions. These are wiring checks, not model attempts, and cannot measure effectiveness.
+
+Set `GITWHY_BENCH_BINARY` to the absolute path of a local git-why binary to enable the real MCP integration test. Without it that test is explicitly skipped. CI builds the binary and runs all tests on Ubuntu and Windows.
+
+### Implemented boundaries and remaining work
+
+- The broker permits only `subject.py` reads/writes and fixed Git history/blame operations. C additionally supports a validated single-line MCP call when a binary is supplied.
+- No shell, arbitrary Git arguments, URL tool, or Python execution tool is exposed. The current broker is intentionally narrower than a full coding agent's environment; report this limitation when comparing tools.
+- Private solutions and checks remain in the controller. A's visible workspace contains no Git metadata; its fixture-building history stays outside the exposed workspace. All conditions receive identical source bytes.
+- Patch checks use a small AST interpreter, with no `exec`, imports, decorators, attribute access, loops, or user-defined calls. Unsupported patches are classified explicitly. This limits the implementation styles accepted by the pilot; broader grading needs a separate sandbox design.
+- Explanation quality and historical accuracy require human review. Passing behavior checks alone is not overall success.
+- This is a tool capability boundary, not an OS sandbox. A future model adapter must receive only the prompt and broker tools, never controller filesystem or shell access. Do not run a local autonomous process against these fixtures without additional isolation.
+- MCP smoke tests use fresh processes and repositories without remotes. The self-check does not exercise MCP or a model. It records missing usage as null and labels itself as a harness check.
+- Complete model-run deadlines, response limits, termination handling, final-answer capture, patches, tool schemas, and provider usage integration must be implemented before any paid pilot. The broker currently enforces call budgets and checks elapsed time between calls, with subprocess timeouts; this is not yet a hard end-to-end attempt deadline.
 
 ## Question
 
@@ -96,10 +120,10 @@ Publish unfavorable results too. Changes to prompts, tools, cases, or grading af
 
 ## Implementation order
 
-- [ ] Build the three fixture histories and private reference checks.
-- [ ] Verify permitted access and leakage prevention in A, B, and C.
+- [x] Build the three fixture histories and private reference checks.
+- [x] Test broker permissions and fixture separation in A, B, and C (adapter isolation still pending).
 - [ ] Implement transcript capture, limits, clean resets, and scoring output.
-- [ ] Run harness checks with a scripted fake model; do not count them as model evaluation.
+- [x] Run harness checks with an omniscient reference driver; do not count them as model evaluation.
 - [ ] Choose a provider/model and API spending cap before paid execution.
 - [ ] Smoke-test one fresh attempt per condition, then freeze the pilot protocol.
 - [ ] Execute and review the 27-attempt controlled pilot.

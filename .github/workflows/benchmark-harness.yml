@@ -1,0 +1,50 @@
+name: Benchmark harness
+
+on:
+  push:
+    branches: [main, codex/benchmark]
+    paths:
+      - benchmark/**
+      - internal/**
+      - cmd/**
+      - main.go
+      - go.mod
+      - go.sum
+      - .github/workflows/benchmark-harness.yml
+  pull_request:
+    branches: [main]
+    paths:
+      - benchmark/**
+      - internal/**
+      - cmd/**
+      - main.go
+      - go.mod
+      - go.sum
+      - .github/workflows/benchmark-harness.yml
+
+permissions:
+  contents: read
+
+jobs:
+  harness:
+    name: Harness (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: actions/setup-python@v6
+        with:
+          python-version: '3.12'
+      - name: Build local MCP binary
+        run: go build -o git-why-bench.exe .
+      - name: Validate harness and real MCP integration
+        shell: bash
+        env:
+          GITWHY_BENCH_BINARY: ${{ github.workspace }}/git-why-bench.exe
+        run: python -m unittest discover -s benchmark -p 'test_*.py' -v
